@@ -1,0 +1,17 @@
+mutation ($input: MakeAdminInput!) {
+	admin {
+		makeAdmin(input: $input) {
+			__typename
+			... on MakeAdminPayload {
+				userId
+			}
+			... on ErrorPayload {
+				message
+				byFields {
+					name
+					value
+				}
+			}
+		}
+	}
+}

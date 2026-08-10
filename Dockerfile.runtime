@@ -1,0 +1,11 @@
+FROM gcr.io/distroless/static-debian12:nonroot
+
+ARG GIT_COMMIT=unknown
+LABEL org.opencontainers.image.revision=${GIT_COMMIT}
+
+COPY tmp/starterkit-amd64 /starterkit
+
+EXPOSE 7301 7302
+
+USER nonroot:nonroot
+ENTRYPOINT ["/starterkit"]

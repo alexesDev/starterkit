@@ -1,0 +1,133 @@
+# One stand's supporting stack: Traefik, Dex and oauth2-proxy, on docker
+# compose. The same file serves dev and e2e — scripts/stack.sh picks the
+# project name, the loopback address the stand owns (dev 127.0.0.81, e2e
+# 127.0.0.82) and the ports, so there is exactly one way to bring a stand up
+# and the two stands never share a socket or a container.
+#
+# Everything runs with host networking and binds loopback: the issuer URL
+# http://dex.<zone>/dex is then one string for the browser, for oauth2-proxy
+# and for the panel, which is the property the whole login flow rests on.
+
+services:
+  traefik:
+    image: traefik:v3.6
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - --entrypoints.web.address=${STARTERKIT_BIND_ADDR:?}:80
+      - --entrypoints.traefik.address=${STARTERKIT_BIND_ADDR:?}:${STARTERKIT_OPS_PORT:-8190}
+      - --api.insecure=true
+      - --ping=true
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --log.level=INFO
+      - --accesslog=true
+    environment:
+      # Read by the sprig templating inside docker/traefik/dynamic/*.yml —
+      # Traefik's file provider renders those files itself, no generation step.
+      STARTERKIT_ZONE: ${STARTERKIT_ZONE:?}
+      STARTERKIT_PANEL_PORT: ${STARTERKIT_PANEL_PORT:?}
+      STARTERKIT_OAUTH_PORT: ${STARTERKIT_OAUTH_PORT:?}
+      STARTERKIT_DEX_PORT: ${STARTERKIT_DEX_PORT:?}
+      STARTERKIT_MAM_PORT: ${STARTERKIT_MAM_PORT:-9080}
+      STARTERKIT_MAM_ROUTING: ${STARTERKIT_MAM_ROUTING:-false}
+    volumes:
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+
+  dex:
+    image: ghcr.io/dexidp/dex:v2.44.0
+    network_mode: host
+    restart: unless-stopped
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    environment:
+      # The Dex image's entrypoint renders the config with gomplate; every
+      # getenv in docker/dex/config.yaml reads one of these. The bcrypt hashes
+      # travel as environment values rather than sitting in the file, because
+      # a hash is full of $ signs a shell would eat.
+      STARTERKIT_ISSUER_URL: ${STARTERKIT_ISSUER_URL:?}
+      STARTERKIT_PANEL_ORIGIN: ${STARTERKIT_PANEL_ORIGIN:?}
+      STARTERKIT_DEX_PORT: ${STARTERKIT_DEX_PORT:?}
+      # Development default — override it in a real deployment.
+      STARTERKIT_OIDC_CLIENT_SECRET: ${STARTERKIT_OIDC_CLIENT_SECRET:-starterkit-secret}
+      STARTERKIT_DEX_ADMIN_EMAIL: ${STARTERKIT_DEX_ADMIN_EMAIL:-admin@example.com}
+      # Development default (password `passpass`) — override it in a real deployment.
+      STARTERKIT_DEX_ADMIN_HASH: ${STARTERKIT_DEX_ADMIN_HASH:-$$2a$$10$$dJw15FVOn.sqWDhpSgpTJ.TCyzxLkacRitqqC/nX2bBEL0QSO0ec6}
+      STARTERKIT_DEX_USER_EMAIL: ${STARTERKIT_DEX_USER_EMAIL:-user@example.com}
+      # Development default (password `passpass`) — override it in a real deployment.
+      STARTERKIT_DEX_USER_HASH: ${STARTERKIT_DEX_USER_HASH:-$$2a$$10$$dJw15FVOn.sqWDhpSgpTJ.TCyzxLkacRitqqC/nX2bBEL0QSO0ec6}
+    volumes:
+      - ./dex/config.yaml:/etc/dex/config.yaml:ro
+      # Dex keeps its signing keys here. Losing them signs everyone out
+      # (docs/auth-dex.md), so dev keeps the volume across `down`; `purge`
+      # removes it, which doubles as the way to exercise the stale-session
+      # path. The e2e project's copy is purged at the start of every run.
+      - dex-data:/var/dex
+
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.13.0
+    network_mode: host
+    # It exits when OIDC discovery fails, and discovery needs Dex routable
+    # through Traefik first; restarting with compose's backoff is the ordering.
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_HTTP_ADDRESS: 127.0.0.1:${STARTERKIT_OAUTH_PORT:?}
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: Dex
+
+      # Identical string for the browser and for this process: host networking
+      # and the stand's own loopback address put both on the same side of every
+      # URL.
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${STARTERKIT_ISSUER_URL:?}
+      OAUTH2_PROXY_CLIENT_ID: starterkit
+      # Development default — override it in a real deployment.
+      OAUTH2_PROXY_CLIENT_SECRET: ${STARTERKIT_OIDC_CLIENT_SECRET:-starterkit-secret}
+      OAUTH2_PROXY_SCOPE: openid profile email
+      OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
+
+      # Reached through Traefik, so the callback is the panel origin on this
+      # stand's entrypoint.
+      OAUTH2_PROXY_REDIRECT_URL: ${STARTERKIT_PANEL_ORIGIN:?}/oauth2/callback
+
+      # Development default, generated for this repository and published with
+      # it, so it is public and worth exactly nothing. Override it anywhere
+      # real:
+      #   openssl rand -base64 32
+      OAUTH2_PROXY_COOKIE_SECRET: ${STARTERKIT_COOKIE_SECRET:-1ZJD8kKCoAWjg8UzaIsHKrNMkJkXL26PYQcHQGolNB4=}
+      # Off because the stand's origin is plain HTTP. Turn it on with the
+      # certificate, not before: a Secure cookie on an http:// origin is never
+      # sent, and the symptom is an endless redirect.
+      OAUTH2_PROXY_COOKIE_SECURE: "false"
+      OAUTH2_PROXY_COOKIE_NAME: _starterkit_forward_auth
+
+      # Dex decides who exists at all; the domain filter would only narrow it
+      # further.
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+
+      # Anything but the "force" default. Dex forces its consent screen on
+      # exactly that string, which would override skipApprovalScreen and add a
+      # Grant Access click to every login. Clearing the value instead does not
+      # work — oauth2-proxy reads options through viper, which discards empty
+      # settings.
+      OAUTH2_PROXY_APPROVAL_PROMPT: auto
+
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+
+      # The panel's whole identity story. This puts the verified ID token into
+      # the Authorization response header of /oauth2/auth, which Traefik copies
+      # onto the upstream request; the panel verifies it against the issuer's
+      # JWKS. Without it the panel has no identity at all and refuses every
+      # request.
+      OAUTH2_PROXY_SET_AUTHORIZATION_HEADER: "true"
+      # Kept false on purpose: the gate answers a blocked request with 401, and
+      # a browser will not follow a Location on a 401. Rendering the sign-in
+      # page in that 401 body is what makes the block usable.
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "false"
+      OAUTH2_PROXY_WHITELIST_DOMAINS: panel.${STARTERKIT_ZONE:?}
+
+      # Nothing is proxied through oauth2-proxy itself; Traefik owns the
+      # upstream.
+      OAUTH2_PROXY_UPSTREAMS: static://202
+
+volumes:
+  dex-data:

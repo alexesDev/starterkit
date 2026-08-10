@@ -1,0 +1,23 @@
+$starterkit_users_catalog $starterkit_catalog
+	param \user
+	menu_title \Users
+	Show_page* $starterkit_users_show
+		user_id <= row_id* 0
+	menu_link_content* /
+		<= User_item* $mol_view
+			sub /
+				<= Row* $mol_row
+					minimal_height 24
+					minimal_width 480
+					sub <= row_content* /
+						<= Id* $starterkit_labeler_id
+							value <= row_id_string* \
+						<= Email* $starterkit_labeler_name
+							title \Email
+							value <= row_email* \
+						<= Status* $starterkit_labeler_name
+							title \Status
+							value <= row_status* \
+						<= Seen* $starterkit_labeler_moment
+							title \Last sign-in
+							value <= row_last_sign_in* \

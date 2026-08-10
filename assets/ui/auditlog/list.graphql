@@ -1,0 +1,21 @@
+query ($limit: Int64!, $before: Int64) {
+	admin {
+		auditLog(limit: $limit, before: $before) {
+			totalCount
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+			nodes {
+				id
+				action
+				email
+				detail
+				ip
+				createdAt {
+					formatted(layout: "2006-01-02 15:04:05")
+				}
+			}
+		}
+	}
+}

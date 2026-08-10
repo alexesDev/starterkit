@@ -1,0 +1,20 @@
+query {
+	admin {
+		users {
+			totalCount
+			nodes {
+				id
+				email
+				name
+				createdAt {
+					formatted(layout: "2006-01-02 15:04")
+				}
+				lastSignInAt {
+					formatted(layout: "2006-01-02 15:04")
+				}
+				isAdmin
+				banReason
+			}
+		}
+	}
+}

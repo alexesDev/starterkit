@@ -1,0 +1,4 @@
+$starterkit_labeler_name $mol_labeler
+	title \Name
+	content /
+		<= value \name

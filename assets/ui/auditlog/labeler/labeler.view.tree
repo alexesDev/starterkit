@@ -1,0 +1,4 @@
+$starterkit_auditlog_labeler $mol_labeler
+	title \
+	content /
+		<= value \

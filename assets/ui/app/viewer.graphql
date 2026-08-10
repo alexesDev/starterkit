@@ -1,0 +1,10 @@
+query {
+	viewer {
+		role
+		user {
+			id
+			email
+			name
+		}
+	}
+}

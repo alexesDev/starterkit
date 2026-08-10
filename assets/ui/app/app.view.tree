@@ -1,0 +1,30 @@
+$starterkit_app $starterkit_catalog
+	param \nav
+	menu_title \Starterkit
+	plugins /
+		<= Theme $mol_theme_auto
+	menu_foot /
+		<= Foot $mol_view
+			style *
+				flexDirection \column
+			sub /
+				<= Signature $mol_view
+					style *
+						flexDirection \column
+						padding \var(--mol_gap_text)
+					sub <= signature_content /
+						<= User $mol_view
+							sub /
+								<= user_email \
+						<= Build $mol_view
+							sub /
+								<= git_commit \
+				<= Sign_out $mol_button_minor
+					title \Sign out
+					click? <=> sign_out? null
+	Spread_default null $starterkit_users_catalog
+	spreads *
+		users <= Users $starterkit_users_catalog
+			close_icon <= Spread_close
+		auditlog <= Auditlog $starterkit_auditlog
+			close_icon <= Spread_close

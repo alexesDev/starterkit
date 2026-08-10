@@ -1,0 +1,56 @@
+# Rendered by the Dex image's own entrypoint, which runs gomplate over every
+# .yaml config it is handed: each getenv below reads the container's
+# environment, which docker/compose.yml supplies. The bcrypt hashes arrive the
+# same way rather than sitting here, because a hash is full of $ signs a shell
+# or an expansion pass would eat.
+#
+# This file is the one copy of the client id, the response type and the
+# redirect URI set — security surface that must not drift between stands.
+
+# One string for the browser, for oauth2-proxy and for the panel. The name
+# resolves to this stand's own loopback address, where its own Traefik holds
+# port 80. It is byte-identical on both sides of every redirect, which is the
+# property the login flow rests on.
+issuer: {{ getenv "STARTERKIT_ISSUER_URL" }}
+
+storage:
+  type: sqlite3
+  config:
+    file: /var/dex/dex.db
+
+web:
+  http: 127.0.0.1:{{ getenv "STARTERKIT_DEX_PORT" }}
+
+oauth2:
+  skipApprovalScreen: true
+  responseTypes:
+    - code
+
+# One client, one entry path: the panel runs no OIDC flow of its own, so
+# oauth2-proxy's callback is the only redirect URI Dex ever has to accept.
+staticClients:
+  - id: starterkit
+    secret: {{ getenv "STARTERKIT_OIDC_CLIENT_SECRET" }}
+    name: Starterkit
+    redirectURIs:
+      - {{ getenv "STARTERKIT_PANEL_ORIGIN" }}/oauth2/callback
+
+# Static identities, no external IdP required. Two of them, so the deny path
+# and the ban path can be exercised: the admin is promoted by
+# STARTERKIT_BOOTSTRAP_ADMIN, the second identity never is.
+#
+# The compose file's default hashes are the committed dev password
+# (passpass), fine for a stand on loopback. enablePasswordDB and
+# staticPasswords are development-only — delete both and configure a real
+# connector before pointing anything real at this. See docs/auth-dex.md.
+enablePasswordDB: true
+
+staticPasswords:
+  - email: {{ getenv "STARTERKIT_DEX_ADMIN_EMAIL" }}
+    hash: "{{ getenv "STARTERKIT_DEX_ADMIN_HASH" }}"
+    username: admin
+    userID: 6f1c2b1e-3f4a-4c8d-9a5b-0e7d2c9f1a33
+  - email: {{ getenv "STARTERKIT_DEX_USER_EMAIL" }}
+    hash: "{{ getenv "STARTERKIT_DEX_USER_HASH" }}"
+    username: user
+    userID: 2b8e4d6a-1c5f-4b2e-8d3a-9f6c0b1e7d44

@@ -1,0 +1,20 @@
+{
+  "name": "starterkit-ui",
+  "private": true,
+  "scripts": {
+    "codegen:ui": "graphql-codegen --config assets/codegen/ui/graphqlgen.js",
+    "codegen:ui:watch": "graphql-codegen --config assets/codegen/ui/graphqlgen.js --watch",
+    "test:e2e": "./scripts/e2e.sh",
+    "test:e2e:update-snapshots": "UPDATE_SNAPSHOTS=1 ./scripts/e2e.sh"
+  },
+  "devDependencies": {
+    "@graphql-codegen/add": "^5.0.3",
+    "@graphql-codegen/cli": "^5.0.7",
+    "@graphql-codegen/typescript": "^4.1.6",
+    "@graphql-codegen/typescript-operations": "^4.6.1",
+    "@playwright/test": "^1.49.0",
+    "graphql": "^16.10.0",
+    "jsdom": "^28.1.0",
+    "typescript": "~5.7.2"
+  }
+}

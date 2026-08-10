@@ -1,0 +1,117 @@
+## Traefik dynamic configuration: the forward-auth gate, for one stand.
+##
+## Every request to the panel host is first sent to this stand's oauth2-proxy
+## /oauth2/auth. Traefik forwards upstream only on 2xx; anything else is
+## returned to the client and the panel is never dialled. That is what makes
+## the gate independent of the panel's own session check.
+##
+## Rendered by Traefik's own file provider, which runs Go templating with
+## sprig over dynamic configuration files: the env lookups below read the
+## Traefik container's environment, which docker/compose.yml supplies once per
+## stand. Each stand has its own Traefik on its own loopback address, so the
+## same file serves both.
+##
+## The Host() rule is still worth having with an address per stand: a request
+## arriving on this address under some other name is answered 404 rather than
+## served by whichever router happened to be least specific.
+##
+## The panel and the oauth2-proxy keep static loopback ports because a
+## forwardAuth address cannot follow a dynamic one; Dex sits on a static
+## per-stand port for the same reason, routed by name below.
+
+{{- $zone := env "STARTERKIT_ZONE" }}
+{{- $panel := printf "panel.%s" $zone }}
+
+http:
+  routers:
+    # Must out-rank the catch-all: the sign-in endpoints cannot sit behind the
+    # middleware that sends people to them.
+    oauth2:
+      rule: "Host(`{{ $panel }}`) && PathPrefix(`/oauth2/`)"
+      entryPoints: [web]
+      service: oauth2-proxy
+      priority: 100
+      middlewares:
+        - security-headers
+
+    # Dex on its own hostname, ungated: it is the sign-in page. The gate's
+    # whole flow terminates here, so putting the forward-auth middleware in
+    # front of it would be a lock on the door the keys are behind.
+    dex:
+      rule: "Host(`dex.{{ $zone }}`)"
+      entryPoints: [web]
+      service: dex
+      priority: 200
+      middlewares:
+        - security-headers
+
+    panel:
+      rule: "Host(`{{ $panel }}`)"
+      entryPoints: [web]
+      service: panel
+      priority: 1
+      middlewares:
+        - security-headers
+        - oauth-errors
+        - oauth-auth
+
+  middlewares:
+    # Framing is the one that matters here: an attacker's page can load the real
+    # panel origin in an iframe, so the victim's own cookies are used and their
+    # clicks land on admin controls under an overlay. The rest is cheap.
+    #
+    # Content-Security-Policy deliberately is not here: it belongs to whoever
+    # knows what a page loads, and applying the panel's policy to oauth2-proxy's
+    # page broke that page's inline script — the one that carries the URL
+    # fragment through the login redirect, which is where this SPA keeps its
+    # whole route. HSTS belongs on a production HTTPS origin, absent here.
+    security-headers:
+      headers:
+        frameDeny: true
+        contentTypeNosniff: true
+        referrerPolicy: same-origin
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+
+    oauth-auth:
+      forwardAuth:
+        address: http://127.0.0.1:{{ env "STARTERKIT_OAUTH_PORT" }}/oauth2/auth
+        trustForwardHeader: true
+        authResponseHeaders:
+          # The panel reads Authorization and nothing else: it is the only one
+          # of these that is signed. The X-Auth-Request-* headers are unsigned
+          # convenience for upstreams that trust the hop blindly, and are kept
+          # only because oauth2-proxy sets them anyway.
+          - Authorization
+          - X-Auth-Request-User
+          - X-Auth-Request-Email
+          - X-Auth-Request-Preferred-Username
+
+    # forwardAuth surfaces oauth2-proxy's 401 verbatim, which is a dead end in a
+    # browser. This turns it into the sign-in page, carrying the original URL so
+    # the user lands back where they started.
+    # 401 only. The panel answers 403 with the reason a session was refused
+    # ("access revoked: <ban reason>"); rewriting that to the sign-in page would
+    # send a banned user round the login loop with nothing explaining why.
+    oauth-errors:
+      errors:
+        status:
+          - "401"
+        service: oauth2-proxy
+        query: "/oauth2/sign_in?rd={url}"
+
+  services:
+    panel:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:{{ env "STARTERKIT_PANEL_PORT" }}
+        passHostHeader: true
+
+    oauth2-proxy:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:{{ env "STARTERKIT_OAUTH_PORT" }}
+
+    dex:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:{{ env "STARTERKIT_DEX_PORT" }}

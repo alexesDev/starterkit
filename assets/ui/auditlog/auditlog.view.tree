@@ -1,0 +1,28 @@
+$starterkit_auditlog $mol_page
+	title \Audit log
+	page_size 50
+	close_icon null $mol_view
+	tools /
+		<= close_icon
+	Row* $mol_row
+		minimal_height 24
+		minimal_width 640
+		sub <= row_content* /
+			<= Created* $starterkit_labeler_moment
+				title \At
+				value <= row_created* \
+			<= Action* $starterkit_auditlog_labeler
+				title \Action
+				value <= row_action* \
+			<= Email* $starterkit_auditlog_labeler
+				title \Email
+				value <= row_email* \
+			<= Detail* $starterkit_auditlog_labeler
+				title \Detail
+				value <= row_detail* \
+	body /
+		<= List $mol_list
+			rows <= rows /
+		<= More $mol_button_minor
+			title \Show more
+			click? <=> more? null

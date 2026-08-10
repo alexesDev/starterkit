@@ -1,0 +1,5 @@
+# view.tree is indentation-sensitive: tabs and LF, never normalized to CRLF.
+assets/ui/** text eol=lf
+
+# Written by `npm run codegen:ui`.
+*.graphql.ts linguist-generated=true

@@ -1,0 +1,164 @@
+scalar Int64
+
+directive @goField(
+  forceResolver: Boolean
+  name: String
+  omittable: Boolean
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+directive @goModel(
+  model: String
+  models: [String!]
+  forceGenerate: Boolean
+) on OBJECT | INPUT_OBJECT | SCALAR | ENUM | INTERFACE | UNION
+
+type Timestamp @goModel(model: "starterkit/internal/dbtime.Stamp") {
+  unix: Int64!
+  formatted(layout: String! = "2006-01-02T15:04:05Z07:00"): String!
+}
+
+type Query {
+  viewer: Viewer!
+  admin: AdminQuery!
+}
+
+type Mutation {
+  signOut: SignOutPayload!
+  admin: AdminMutation!
+}
+
+type Viewer {
+  user: User
+  role: ViewerRole! @goField(forceResolver: true)
+}
+
+enum ViewerRole {
+  ADMIN
+  USER
+  GUEST
+}
+
+type User @goModel(model: "starterkit/internal/db.User") {
+  id: Int64!
+  email: String!
+  name: String!
+  createdAt: Timestamp!
+}
+
+type SignOutPayload {
+  redirectUrl: String!
+}
+
+type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
+  users: UsersConnection!
+  user(id: Int64!): AdminUser
+  admins: AdminsConnection!
+  auditLog(limit: Int64! = 50, before: Int64): AuditLogConnection!
+  buildGitCommit: String!
+}
+
+type AdminMutation @goModel(model: "starterkit/internal/model.AdminMutation") {
+  banUser(input: BanUserInput!): BanUserOrErrorPayload!
+  unbanUser(input: UnbanUserInput!): UnbanUserOrErrorPayload!
+  makeAdmin(input: MakeAdminInput!): MakeAdminOrErrorPayload!
+  removeAdmin(input: RemoveAdminInput!): RemoveAdminOrErrorPayload!
+}
+
+type UsersConnection {
+  totalCount: Int64! @goField(forceResolver: true)
+  nodes: [AdminUser!]! @goField(forceResolver: true)
+}
+
+type AdminUser @goModel(model: "starterkit/internal/db.DBListUsersRow") {
+  id: Int64!
+  email: String!
+  name: String!
+  createdAt: Timestamp!
+  lastSignInAt: Timestamp
+  isAdmin: Boolean! @goField(forceResolver: true)
+  banReason: String!
+}
+
+type AdminsConnection {
+  totalCount: Int64! @goField(forceResolver: true)
+  nodes: [Admin!]! @goField(forceResolver: true)
+}
+
+type Admin @goModel(model: "starterkit/internal/db.DBListAdminsRow") {
+  userId: Int64!
+  email: String!
+  name: String!
+  createdAt: Timestamp!
+}
+
+type AuditLogConnection @goModel(model: "starterkit/internal/graph/model.AuditLogConnection") {
+  totalCount: Int64!
+  nodes: [AuditLogEntry!]!
+  pageInfo: PageInfo!
+}
+
+type PageInfo @goModel(model: "starterkit/internal/graph/model.PageInfo") {
+  hasNextPage: Boolean!
+  endCursor: Int64
+}
+
+type AuditLogEntry @goModel(model: "starterkit/internal/db.AuditLog") {
+  id: Int64!
+  userId: Int64
+  email: String!
+  action: String!
+  detail: String!
+  ip: String!
+  createdAt: Timestamp!
+}
+
+type ErrorPayload {
+  message: String!
+  byFields: [FieldMessage!]!
+}
+
+type FieldMessage {
+  name: String!
+  value: String!
+}
+
+input BanUserInput {
+  userId: Int64!
+  reason: String!
+}
+
+type BanUserPayload {
+  userId: Int64!
+}
+
+union BanUserOrErrorPayload = BanUserPayload | ErrorPayload
+
+input UnbanUserInput {
+  userId: Int64!
+}
+
+type UnbanUserPayload {
+  userId: Int64!
+}
+
+union UnbanUserOrErrorPayload = UnbanUserPayload | ErrorPayload
+
+input MakeAdminInput {
+  userId: Int64!
+}
+
+type MakeAdminPayload {
+  userId: Int64!
+}
+
+union MakeAdminOrErrorPayload = MakeAdminPayload | ErrorPayload
+
+input RemoveAdminInput {
+  userId: Int64!
+}
+
+type RemoveAdminPayload {
+  userId: Int64!
+}
+
+union RemoveAdminOrErrorPayload = RemoveAdminPayload | ErrorPayload

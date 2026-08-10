@@ -1,0 +1,18 @@
+query ($id: Int64!) {
+	admin {
+		user(id: $id) {
+			id
+			email
+			name
+			createdAt {
+				formatted
+			}
+			lastSignInAt {
+				unix
+				formatted
+			}
+			isAdmin
+			banReason
+		}
+	}
+}

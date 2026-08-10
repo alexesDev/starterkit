@@ -1,0 +1,5 @@
+$starterkit_labeler_moment $mol_labeler
+	title \Date
+	value \
+	content /
+		<= shown_value \date

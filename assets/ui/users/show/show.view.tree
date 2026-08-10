@@ -1,0 +1,51 @@
+$starterkit_users_show $mol_page
+	user_id? 0
+	nav_param \user
+	title <= email \
+	tools /
+		<= Make_admin $mol_button_minor
+			title \Make Admin
+			enabled <= make_admin_enabled false
+			click? <=> make_admin? null
+		<= Remove_admin $mol_button_minor
+			title \Remove Admin
+			enabled <= remove_admin_enabled false
+			click? <=> remove_admin? null
+		<= Ban $mol_button_minor
+			title \Ban
+			enabled <= ban_enabled false
+			click? <=> ban? null
+		<= Unban $mol_button_minor
+			title \Unban
+			enabled <= unban_enabled false
+			click? <=> unban? null
+	body /
+		<= Fields $mol_list
+			rows /
+				<= Id_field $mol_labeler
+					title \ID
+					content /
+						<= id_string \
+				<= Name_field $mol_labeler
+					title \Name
+					content /
+						<= name \
+				<= Role_field $mol_labeler
+					title \Role
+					content /
+						<= role \
+				<= Created_field $mol_labeler
+					title \Created At
+					content /
+						<= created \
+				<= Seen_field $starterkit_labeler_moment
+					title \Last sign-in
+					value <= last_sign_in \
+		<= Reason_field $mol_form_field
+			name \Reason
+			bid <= reason_bid \
+			control <= Reason $mol_string
+				hint \Reason for the ban
+				value? <=> reason? \
+		<= Status $mol_status
+			message <= message \

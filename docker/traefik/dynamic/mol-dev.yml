@@ -1,0 +1,50 @@
+## Dev-only routing: the root belongs to the UI. The mam dev server, which
+## rebuilds on save, answers everything the panel's base path does not claim,
+## so the SPA at / is the live workspace instead of the bundle embedded in the
+## panel binary. What scopes this file to dev is the STARTERKIT_MAM_ROUTING
+## guard below, which docker/compose.yml sets only on the dev stand's Traefik.
+## The e2e stand and production serve the built bundle through the panel
+## catch-all in gate.yml.
+##
+## The gate middlewares are load-bearing here, not decoration: the panel's own
+## session check cannot cover pages the panel no longer serves, so forward-auth
+## is the only wall in front of the admin UI on this path.
+##
+## The mam server serves its whole workspace, every package in it — accepted in
+## dev because the same gate fronts it.
+
+{{- if eq (env "STARTERKIT_MAM_ROUTING") "true" }}
+{{- $panel := printf "panel.%s" (env "STARTERKIT_ZONE") }}
+
+http:
+  routers:
+    # Above the workspace catch-all below, under the sign-in endpoints (100):
+    # the panel keeps its base path, /oauth2/* keeps out-ranking everything.
+    panel-base:
+      rule: "Host(`{{ $panel }}`) && PathPrefix(`/_system/starterkit`)"
+      entryPoints: [web]
+      service: panel
+      priority: 60
+      middlewares:
+        - security-headers
+        - oauth-errors
+        - oauth-auth
+
+    # Shadows the panel catch-all in gate.yml (priority 1), which is exactly the
+    # dev change: everything outside the base path is the mam workspace.
+    mol-dev:
+      rule: "Host(`{{ $panel }}`)"
+      entryPoints: [web]
+      service: mol-dev
+      priority: 50
+      middlewares:
+        - security-headers
+        - oauth-errors
+        - oauth-auth
+
+  services:
+    mol-dev:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:{{ env "STARTERKIT_MAM_PORT" }}
+{{- end }}

@@ -1,0 +1,27 @@
+# Docker does not read .gitignore, and the build does `COPY . .`. Without this
+# file every local secret and database in the checkout is uploaded into the
+# build context and can persist in builder cache layers even though the final
+# distroless image does not contain them.
+#
+# An allowlist, so a file added later is excluded until someone says otherwise.
+*
+
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!assets/
+!db/
+!queries.read.sql
+!queries.write.sql
+!tmp/
+tmp/*
+!tmp/starterkit-amd64
+
+# Reachable through the allowlist above, and none of it belongs in an image.
+assets/ui/**/-/
+**/node_modules/
+**/*.sqlite3
+**/*.sqlite3-*
+**/.env
+**/.env.*

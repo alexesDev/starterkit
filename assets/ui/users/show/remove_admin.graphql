@@ -1,0 +1,17 @@
+mutation ($input: RemoveAdminInput!) {
+	admin {
+		removeAdmin(input: $input) {
+			__typename
+			... on RemoveAdminPayload {
+				userId
+			}
+			... on ErrorPayload {
+				message
+				byFields {
+					name
+					value
+				}
+			}
+		}
+	}
+}

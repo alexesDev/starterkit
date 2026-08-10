@@ -10,8 +10,12 @@ import (
 
 	"starterkit/internal/appreq"
 	"starterkit/internal/audit"
+	"starterkit/internal/case/banuser"
+	"starterkit/internal/case/listauditlog"
+	"starterkit/internal/case/makeadmin"
+	"starterkit/internal/case/removeadmin"
+	"starterkit/internal/case/unbanuser"
 	"starterkit/internal/db"
-	model1 "starterkit/internal/graph/model"
 	"starterkit/internal/logger"
 	"starterkit/internal/model"
 )
@@ -20,17 +24,17 @@ type Resolver struct {
 	DefaultEnv Env
 }
 
-// Env is an aggregate of the case contracts, one line each, plus the plain
-// reads a case package would only wrap. It cannot drift from the cases,
-// because it is made of them. See docs/env-pattern.md.
+// Env is the aggregate at the edge: one line per case, written in that case's
+// own Input and Payload types, plus the plain reads a case package would only
+// wrap. See docs/env-pattern.md.
 type Env interface {
 	audit.Writer
 
-	BanUser(ctx context.Context, input model1.BanUserInput) (model1.BanUserOrErrorPayload, error)
-	UnbanUser(ctx context.Context, input model1.UnbanUserInput) (model1.UnbanUserOrErrorPayload, error)
-	MakeAdmin(ctx context.Context, input model1.MakeAdminInput) (model1.MakeAdminOrErrorPayload, error)
-	RemoveAdmin(ctx context.Context, input model1.RemoveAdminInput) (model1.RemoveAdminOrErrorPayload, error)
-	ListAuditLog(ctx context.Context, limit int64, before *int64) (*model1.AuditLogConnection, error)
+	BanUser(ctx context.Context, input banuser.Input) (banuser.Payload, error)
+	UnbanUser(ctx context.Context, input unbanuser.Input) (unbanuser.Payload, error)
+	MakeAdmin(ctx context.Context, input makeadmin.Input) (makeadmin.Payload, error)
+	RemoveAdmin(ctx context.Context, input removeadmin.Input) (removeadmin.Payload, error)
+	ListAuditLog(ctx context.Context, limit int64, before *int64) (*listauditlog.Result, error)
 
 	DBListUsers(ctx context.Context) ([]db.DBListUsersRow, error)
 	DBCountUsers(ctx context.Context) (int64, error)
@@ -38,6 +42,7 @@ type Env interface {
 	DBListAdmins(ctx context.Context) ([]db.DBListAdminsRow, error)
 	DBCountAdmins(ctx context.Context) (int64, error)
 
+	RecordSignOut(ctx context.Context)
 	SignOutURL() string
 	BuildGitCommit() string
 	Logger() logger.Logger

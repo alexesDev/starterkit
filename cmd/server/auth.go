@@ -201,6 +201,31 @@ func (a *app) recordSignIn(ctx context.Context, req *appreq.Request, identity db
 	a.WriteAudit(ctx, signIn)
 }
 
+// RecordSignOut writes the audit row while the request still has an identity.
+// The session it once cleared belongs to oauth2-proxy now, so the mutation only
+// records the intent and hands back where to go; keeping it is what puts a
+// leaving user in the audit log at all.
+func (a *app) RecordSignOut(ctx context.Context) {
+	req, err := appreq.FromCtx(ctx)
+	if err != nil {
+		return
+	}
+
+	user := req.User()
+	if user == nil {
+		return
+	}
+
+	signOut := audit.Entry{
+		UserID: &user.ID,
+		Email:  user.Email,
+		Action: audit.ActionSignOut,
+		IP:     req.IP(),
+	}
+
+	a.WriteAudit(ctx, signOut)
+}
+
 func (a *app) firstSignIn(ctx context.Context, req *appreq.Request, claimed *gateauth.Identity) (*model.AuthIdentity, error) {
 	signIn := signinbyoidc.Input{
 		Issuer:   claimed.Issuer,

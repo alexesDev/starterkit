@@ -271,22 +271,68 @@ probe; `purgeauditlog` keeps one because retention `<= 0` means do nothing;
 `notifyuserbanned` keeps one because a user unbanned between the enqueue and
 the run is an answer rather than a failure.
 
+## A mutation takes one `input` and returns a union with `ErrorPayload`
+
+Both halves of the shape are the convention, and the first mutation added to a
+new project is exactly where it gets broken.
+
+**One argument, named `input`, of a dedicated `XInput` type** — never a list of
+loose scalar arguments. Adding a field is then a change to one input type
+rather than a new argument on the field, so a mutation can grow without every
+caller's query text changing and without the resolver signature moving.
+
+**A union of the success payload and `ErrorPayload`** — never a bare payload,
+never a nullable one:
+
+```graphql
+input BanUserInput {
+  userId: Int64!
+  reason: String!
+}
+
+type BanUserPayload {
+  userId: Int64!
+}
+
+union BanUserOrErrorPayload = BanUserPayload | ErrorPayload
+
+type AdminMutation {
+  banUser(input: BanUserInput!): BanUserOrErrorPayload!
+}
+```
+
+**Infrastructure failure is an `error`. Domain failure is an `ErrorPayload`
+with a nil error.** An input the domain rejects is a normal answer the UI
+renders, not a 500 — and the union is how that rule reaches the wire. A domain
+failure is a value the union carries; GraphQL's top-level `errors[]` is left for
+transport and programming failures, which is what it is for.
+
+What it buys the client: the payload switch on `__typename` is exhaustive, so a
+client cannot forget to handle the failure branch, and a new failure mode
+arrives as a typed member rather than as an untyped string somebody has to
+parse. `ErrorPayload.byFields` carries validation failures keyed by input field,
+so a form puts each message under the control that caused it.
+
+`signOut` is the one mutation in the kit that does not follow this: it takes no
+input and has no domain failure — there is nothing to reject — so it returns
+`SignOutPayload!` directly. A mutation with an input follows the shape.
+
 ## Adding a use case
 
 1. `internal/case/<verb><noun>/resolve.go` — declare a narrow `Env` with only
    what it touches, plus `Input`, `Payload`, `Resolve`.
-2. Add the field to `internal/graph/schema.graphqls`, run `make gqlgen`.
-3. Implement the resolver as a thin adapter — one to three lines plus the
-   payload switch.
-4. Add the case's `Env` to `graph.Env` (one line).
+2. Add the field to `internal/graph/schema.graphqls` in the shape above — one
+   `input: XInput!` argument, returning `XOrErrorPayload!` — then run
+   `make gqlgen`.
+3. Implement the resolver as a thin adapter. For a mutation that is one line:
+   `return r.env(ctx).BanUser(ctx, input)`. The choice between payload and
+   `ErrorPayload` is the case's, not the resolver's.
+4. Add the command to `graph.Env`, written in the case's own `Input` and
+   `Payload` types (one line), and to `cmd/server/commands.go`.
 5. `//go:generate` the mock, write the test.
 
 If it does not compile, `app` is missing a method — that is the wiring check
 working, not a problem.
-
-**Infrastructure failure is an `error`. Domain failure is an `ErrorPayload`
-with a nil error.** An input the domain rejects is a normal answer the UI
-renders, not a 500.
 
 ## Migrations
 

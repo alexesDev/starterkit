@@ -9,13 +9,123 @@ Schema first: edit the SDL, run `make gqlgen`, implement whatever stub appears.
 A resolver translates and delegates. It contains no logic:
 
 ```go
-func (r *adminMutationResolver) BanUser(ctx context.Context, obj *model1.AdminMutation, input model.BanUserInput) (model.BanUserOrErrorPayload, error) {
-	return r.env(ctx).BanUser(ctx, input)
+func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, limit int64, before *int64) (*model.AuditLogConnection, error) {
+	return r.env(ctx).ListAuditLog(ctx, limit, before)
 }
 ```
 
 `r.env(ctx)` pulls the request-scoped env — during a mutation, that is the
 transaction-scoped copy.
+
+The longest resolver in this kit is twelve lines, and it is twelve only because
+sqlc names a row type per query (`internal/graph/rows.go`). Anything longer,
+especially a permission check, belongs in a case where a test can reach it.
+
+## The shape of a mutation
+
+Every mutation takes exactly one argument named `input`, and returns a union of
+its payload and `ErrorPayload`. `banUser` is the worked example, and the three
+sides line up like this.
+
+The schema:
+
+```graphql
+input BanUserInput {
+  userId: Int64!
+  reason: String!
+}
+
+type BanUserPayload {
+  userId: Int64!
+}
+
+union BanUserOrErrorPayload = BanUserPayload | ErrorPayload
+
+type AdminMutation {
+  banUser(input: BanUserInput!): BanUserOrErrorPayload!
+}
+```
+
+The Go gqlgen generates from it — the union is an interface, and each member
+carries a marker method, so only a declared member can be returned:
+
+```go
+type BanUserOrErrorPayload interface {
+	IsBanUserOrErrorPayload()
+}
+
+type BanUserPayload struct {
+	UserID int64 `json:"userId"`
+}
+
+type ErrorPayload struct {
+	Message  string         `json:"message"`
+	ByFields []FieldMessage `json:"byFields"`
+}
+```
+
+The case aliases both, so its signature is stated in schema terms and there is
+no second set of types to map:
+
+```go
+// internal/case/banuser/resolve.go
+type (
+	Input   = model.BanUserInput
+	Payload = model.BanUserOrErrorPayload
+)
+```
+
+and the choice between the two branches is the case's, never the resolver's:
+
+```go
+if actor != nil && *actor == input.UserID {
+	return &model.ErrorPayload{Message: "you cannot ban yourself"}, nil
+}
+// ...
+return &model.BanUserPayload{UserID: input.UserID}, nil
+```
+
+Note the `nil` error on the refusal. **Infrastructure failure is an `error`;
+domain failure is an `ErrorPayload` with a nil error** — the same rule
+[rules.md](rules.md) states, and the union is how it reaches the wire. A
+rejected input is a value the response carries. GraphQL's top-level `errors[]`
+is left for transport and programming failures, which is what it is for, and it
+is also what `runInTx` keys the commit on: a nil error commits, so a case that
+refuses without writing commits an empty transaction, which is correct.
+
+The resolver is one line:
+
+```go
+func (r *adminMutationResolver) BanUser(ctx context.Context, obj *model1.AdminMutation, input model.BanUserInput) (model.BanUserOrErrorPayload, error) {
+	return r.env(ctx).BanUser(ctx, input)
+}
+```
+
+And the client switches exhaustively on `__typename`, so the failure branch
+cannot be forgotten and a new failure mode arrives typed rather than as a string
+somebody has to parse:
+
+```graphql
+banUser(input: $input) {
+  __typename
+  ... on BanUserPayload { userId }
+  ... on ErrorPayload { message byFields { name value } }
+}
+```
+
+`ErrorPayload.byFields` keys validation messages by input field, so a form puts
+each one under the control that caused it rather than showing one banner;
+`assets/ui/gql/fielderrors.ts` is the client half.
+
+Two consequences of the single `input` argument worth stating: adding a field is
+a change to one input type rather than a new argument on the field, so no
+caller's query text has to change and the resolver signature stays put; and the
+audit log records `detail` as the operation's variables, which is one object per
+mutation rather than a scatter of scalars.
+
+`signOut` is the one mutation here that does not follow the shape — it takes no
+input and has no domain failure, so it returns `SignOutPayload!` directly. Any
+mutation with an input follows it.
 
 ## The admin namespace
 

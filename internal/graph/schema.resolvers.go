@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"starterkit/internal/appreq"
-	"starterkit/internal/audit"
 	"starterkit/internal/db"
 	"starterkit/internal/graph/generated"
 	"starterkit/internal/graph/model"
@@ -54,15 +53,9 @@ func (r *adminQueryResolver) User(ctx context.Context, obj *model1.AdminQuery, i
 		return nil, fmt.Errorf("failed to load user %d: %w", id, err)
 	}
 
-	return &db.DBListUsersRow{
-		ID:           row.ID,
-		Email:        row.Email,
-		Name:         row.Name,
-		CreatedAt:    row.CreatedAt,
-		LastSigninAt: row.LastSigninAt,
-		IsAdmin:      row.IsAdmin,
-		BanReason:    row.BanReason,
-	}, nil
+	bound := adminUserRow(row)
+
+	return &bound, nil
 }
 
 // Admins is the resolver for the admins field.
@@ -107,24 +100,10 @@ func (r *adminsConnectionResolver) Nodes(ctx context.Context, obj *model.AdminsC
 
 // SignOut is the resolver for the signOut field.
 func (r *mutationResolver) SignOut(ctx context.Context) (*model.SignOutPayload, error) {
-	req, err := appreq.FromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read the request: %w", err)
-	}
+	env := r.env(ctx)
+	env.RecordSignOut(ctx)
 
-	user := req.User()
-	if user != nil {
-		signOut := audit.Entry{
-			UserID: &user.ID,
-			Email:  user.Email,
-			Action: audit.ActionSignOut,
-			IP:     req.IP(),
-		}
-
-		r.env(ctx).WriteAudit(ctx, signOut)
-	}
-
-	return &model.SignOutPayload{RedirectURL: r.env(ctx).SignOutURL()}, nil
+	return &model.SignOutPayload{RedirectURL: env.SignOutURL()}, nil
 }
 
 // Admin is the resolver for the admin field.

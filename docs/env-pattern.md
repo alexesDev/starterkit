@@ -2,8 +2,14 @@
 
 The architecture this kit is built on. It has no established name; it is a
 natural evolution of idiomatic Go applied to a real monolith, and it is what
-seven years of one settled into. This page is both halves: why it is shaped
-this way, and what to do on a Tuesday.
+seven years of one settled into.
+
+The pattern is described in full, with the history and the audit that produced
+the warnings near the bottom of this page, in
+[The Env Pattern: One IO Spine, Portable Business Logic](https://trip2g.com/en/thoughts/env_pattern).
+Read that for the argument. This page is the operational half — what the kit
+actually does, and what to do on a Tuesday — and every claim on it was checked
+against the code in this repository.
 
 ## The idea
 
@@ -140,8 +146,15 @@ graph.NewHandler(a)
 ```
 
 `NewHandler` takes a `graph.Env`, so that call in `cmd/server/http.go` is the
-whole DI container. Add a method to a case `Env`, forget to implement it, and
-the build fails — pointing at the exact contract.
+whole DI container. Add a method to a case `Env`, forget to implement it on
+`app`, and the build fails naming the contract and the missing method. That is
+not a claim; it is what `go build ./...` prints:
+
+```
+cmd/server/commands.go:35:35: cannot use env (variable of type *app) as
+unbanuser.Env value in argument to unbanuser.Resolve: *app does not implement
+unbanuser.Env (missing method NotifyUserUnbanned)
+```
 
 The proof must be a *side effect of the wiring*, not a separate discipline. A
 file full of `var _ pkg.Env = app` is a manual ritual that drifts. Constructors
@@ -166,13 +179,14 @@ performs safety it cannot provide.
 ## The edge of the system: one fat interface, and it is honest
 
 If every case declares a narrow `Env`, something has to gather them. Here that
-is `graph.Env`, an aggregate of case contracts, one line each:
+is `graph.Env`, one line per case:
 
 ```go
 type Env interface {
 	audit.Writer
 
-	BanUser(ctx context.Context, input model1.BanUserInput) (model1.BanUserOrErrorPayload, error)
+	BanUser(ctx context.Context, input banuser.Input) (banuser.Payload, error)
+	UnbanUser(ctx context.Context, input unbanuser.Input) (unbanuser.Payload, error)
 	// ...
 
 	// Plain reads sit here directly.
@@ -181,19 +195,31 @@ type Env interface {
 }
 ```
 
-It cannot drift from the cases, because it is made of them: the interface is a
-table of contents for everything GraphQL serves. A fat interface at the boundary
-is not a retreat from interface segregation; it is its aggregate. Segregated
-contracts have to meet somewhere, and one explicit place beats being smeared
-across the codebase.
+**One difference from the essay is worth knowing, because it is a consequence of
+a decision made elsewhere in this kit.** The essay's `graph.Env` *embeds* the
+case contracts — `hidenotes.Env`, `pushnotes.Env` — because there a resolver
+calls `hidenotes.Resolve(ctx, r.env(ctx), input)` and therefore needs everything
+the case needs. Here a resolver calls a *command* on `app`, because a command
+owns its transaction ([graphql.md](graphql.md)), so what the edge needs is the
+command signature, not the case's dependencies.
+
+The line is still written in the case's own `Input` and `Payload` types, which
+keeps the property that matters: the aggregate names the case packages, so it
+reads as a table of contents of everything GraphQL serves, and a change to a
+case's contract reaches this interface at compile time rather than silently. It
+is a sum of contracts either way — just of the commands rather than of the
+`Env`s.
+
+A fat interface at the boundary is not a retreat from interface segregation; it
+is its aggregate. Segregated contracts have to meet somewhere, and one explicit
+place beats being smeared across the codebase.
 
 The second thing it buys: the app-graph import cycle breaks without tricks. The
 `graph` package cannot import `cmd/server`, so it declares the contract on its
 side and `app` fulfils it. A consumer-defined interface, just a big one.
 
-Duplicate methods across embedded interfaces are legal (Go 1.14+), which is what
-makes this work at scale. A *conflicting* signature for the same method name is
-a compile error at the aggregate — so keep case method names specific.
+Two commands cannot share a name here, so keep them specific: the aggregate is
+one flat interface and a second `Update` would collide with the first.
 
 ## Transactions: why Begin() does not return Env
 
@@ -263,18 +289,26 @@ Two legal options:
   implements it in one line. `banuser` does exactly this with
   `EnqueueUserBannedNotice`, which is `a.EnqueueJob(...)` on the other side and
   says nothing about how the notice is delivered.
-- *Embedding.* If a case genuinely needs another's whole contract, embed it:
-  `type Env interface { renderlayout.Env; /* ... */ }`
+- *Embedding.* If a case genuinely needs another's whole contract, embed it —
+  `type Env interface { othercase.Env; /* its own methods */ }`. Duplicate
+  methods across embedded interfaces are legal since Go 1.14, which is what
+  makes this scale.
 
 Ports are for orchestration ("do X, do not tell me how"). Embedding is for
 shared capability ("I need everything that layer can do"). There is no third
 way.
 
+**Embedding has no instance in this kit** — no case here needs another's whole
+contract, and inventing one to illustrate the mechanism would be a package that
+does nothing. The port does have one, and no case in this repository imports
+another case.
+
 **Business logic drifting into resolvers.** In the audit, five resolvers had
 grown to 34–73 lines each, including access-control checks living in the
-transport layer where case tests cannot reach them. A resolver should be one to
-three lines. Anything longer — especially a permission check — belongs in a
-case.
+transport layer where case tests cannot reach them; extracting the logic put
+them back at 3–13 lines. A mutation resolver in this kit is one line, and the
+longest resolver of any kind is twelve. Anything longer — especially a
+permission check — belongs in a case, where a test can reach it.
 
 **Duplicated retry and timeout logic.** Four copies, all four with the same
 three bugs: a timeout derived from `context.Background()` that ignores
@@ -286,11 +320,14 @@ Where the wiring stayed static, nothing rotted in seven years.
 
 ## Places the pattern is deliberately not pressed all the way
 
-**An entry cast at the boundary.** `Resolver.env(ctx)` casts the request-scoped
-`req.Env` to `graph.Env`. Removing it would mean giving up context-carried env,
-and that is the same mechanism that swaps the env inside a transaction. The cast
-stays, backed from the other side by `graph.NewHandler(a)`, which the compiler
-checks.
+**Two runtime casts, both at a boundary and both deliberate.**
+`Resolver.env(ctx)` casts the request-scoped `req.Env` to `graph.Env`, and
+`app.txEnvFromCtx` casts it to `*app` to find an open transaction. Removing them
+would mean giving up context-carried env, and that is the same mechanism that
+swaps the env inside a transaction. They stay, backed from the other side by
+`graph.NewHandler(a)`, which the compiler checks. Neither is the anti-pattern
+above: neither reaches for a *foreign case's* contract in the middle of business
+logic.
 
 **Transport machinery in the transport layer.** A subscription pump, a file
 upload, a streaming response: that is plumbing, and it has no business in a
@@ -309,6 +346,7 @@ abstractions, not on `*app`), and hexagonal architecture (every `Env` is a port,
 `app` is the adapter) — with Go interfaces as the container and no framework at
 all.
 
+- [The Env Pattern: One IO Spine, Portable Business Logic](https://trip2g.com/en/thoughts/env_pattern) — the source this kit implements
 - Peter Bourgon, [Go for Industrial Programming](https://peter.bourgon.org/go-for-industrial-programming/)
 - Dave Cheney, [SOLID Go Design](https://dave.cheney.net/2016/08/20/solid-go-design)
 - [benbjohnson/wtf](https://github.com/benbjohnson/wtf) — the same family, inverted: the interface is declared by the provider, one per entity, and mocks are handwritten

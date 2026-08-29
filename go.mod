@@ -5,11 +5,13 @@ go 1.26.1
 require (
 	github.com/99designs/gqlgen v0.17.94
 	github.com/amacneil/dbmate/v2 v2.34.1
+	github.com/bradleyjkemp/cupaloy/v2 v2.8.0
 	github.com/coreos/go-oidc/v3 v3.20.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.4.1
 	github.com/joho/godotenv v1.5.1
 	github.com/prometheus/client_golang v1.24.1
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/stretchr/testify v1.11.1
 	github.com/vektah/gqlparser/v2 v2.5.36
 	maragu.dev/goqite v0.4.0
 	modernc.org/sqlite v1.54.0
@@ -259,7 +261,6 @@ require (
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/tdewolff/parse/v2 v2.8.12 // indirect
 	github.com/tetafro/godot v1.5.6 // indirect

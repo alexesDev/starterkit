@@ -1,0 +1,6 @@
+(db.DBInsertUserBanParams) {
+  UserID: (int64) 2,
+  BannedBy: (*int64)(1),
+  Reason: (string) (len=4) "spam",
+  CreatedAt: (dbtime.Stamp) 2026-08-06 07:06:40 +0000 UTC
+}

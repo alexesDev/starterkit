@@ -273,6 +273,28 @@ Every `Env` is small, so the mock is small. `//go:generate` lines produce them:
 lives next to the case it covers. There is no God mock in this repository and
 there should never be one.
 
+Assertions are `github.com/stretchr/testify/require` — `require`, not
+`assert`. `require` stops the test at the first failure, so the report names
+the cause; `assert` carries on and buries it under its consequences.
+
+Where a test would check many fields of one value,
+`github.com/bradleyjkemp/cupaloy/v2` snapshots the value instead of a column
+of `require.Equal` lines. `banuser` does this with the row it stores:
+
+```go
+cupaloy.SnapshotT(t, stored)
+```
+
+The diff runs against a committed file in the package's `.snapshots/`
+directory, and a field nobody thought to assert still shows up the day it
+changes. `UPDATE_SNAPSHOTS=true go test ./...` re-records; read the diff
+before committing it, because the baseline is the assertion. Everything inside
+the snapshot must be deterministic — `banuser` can snapshot a row with a
+timestamp because the mock's `Now` is fixed.
+
+Those three — moq, require, cupaloy — are the whole toolbox. A new test that
+wants another library is a design question, not a dependency to add.
+
 ## What this pattern is prone to
 
 Learned the hard way, over seven years and one audit of sixty-one cases. All

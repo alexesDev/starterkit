@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/bradleyjkemp/cupaloy/v2"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/banuser"
@@ -43,15 +43,11 @@ func TestResolveRecordsTheBanCountsItAndEnqueuesTheNotice(t *testing.T) {
 	success, ok := result.(*model.BanUserPayload)
 	require.True(t, ok, "expected success, got %#v", result)
 
-	assert.Equal(t, int64(2), success.UserID)
-	assert.Equal(t, "spam", stored.Reason, "the reason was not trimmed")
+	require.Equal(t, int64(2), success.UserID)
+	cupaloy.SnapshotT(t, stored)
 
-	if assert.NotNil(t, stored.BannedBy, "the ban was not attributed to the actor") {
-		assert.Equal(t, actor, *stored.BannedBy)
-	}
-
-	assert.Len(t, env.MetricsIncreaseUserBannedCalls(), 1, "the banned counter was not incremented")
-	assert.Len(t, env.EnqueueUserBannedNoticeCalls(), 1, "the notice was not enqueued")
+	require.Len(t, env.MetricsIncreaseUserBannedCalls(), 1, "the banned counter was not incremented")
+	require.Len(t, env.EnqueueUserBannedNoticeCalls(), 1, "the notice was not enqueued")
 }
 
 func TestResolveRefusesAnEmptyReasonWithoutTouchingTheDatabase(t *testing.T) {
@@ -63,7 +59,7 @@ func TestResolveRefusesAnEmptyReasonWithoutTouchingTheDatabase(t *testing.T) {
 	_, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Empty(t, env.DBGetUserByIDCalls(), "a missing reason must not reach the database")
+	require.Empty(t, env.DBGetUserByIDCalls(), "a missing reason must not reach the database")
 }
 
 func TestResolveRefusesToLetTheActorBanThemselves(t *testing.T) {
@@ -76,7 +72,7 @@ func TestResolveRefusesToLetTheActorBanThemselves(t *testing.T) {
 	_, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Empty(t, env.DBInsertUserBanCalls(), "a self-ban must not be written")
+	require.Empty(t, env.DBInsertUserBanCalls(), "a self-ban must not be written")
 }
 
 func TestResolveReportsAnUnknownUserAsDataNotError(t *testing.T) {
@@ -93,7 +89,7 @@ func TestResolveReportsAnUnknownUserAsDataNotError(t *testing.T) {
 	_, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Empty(t, env.DBInsertUserBanCalls(), "no ban may be written for a user that does not exist")
+	require.Empty(t, env.DBInsertUserBanCalls(), "no ban may be written for a user that does not exist")
 }
 
 func TestResolveBansOnBehalfOfNobodyWhenThereIsNoCurrentUser(t *testing.T) {
@@ -104,7 +100,7 @@ func TestResolveBansOnBehalfOfNobodyWhenThereIsNoCurrentUser(t *testing.T) {
 	_, err := banuser.Resolve(t.Context(), env, banuser.Input{UserID: 2, Reason: "spam"})
 	require.NoError(t, err)
 
-	assert.Nil(t, stored.BannedBy, "bannedBy should stay nil")
+	require.Nil(t, stored.BannedBy, "bannedBy should stay nil")
 }
 
 func TestResolvePropagatesAUserLookupFailure(t *testing.T) {
@@ -130,5 +126,5 @@ func TestResolvePropagatesAFailedEnqueueSoTheBanRollsBack(t *testing.T) {
 	_, err := banuser.Resolve(t.Context(), env, banuser.Input{UserID: 2, Reason: "spam"})
 	require.Error(t, err, "an enqueue that failed inside the transaction must fail the ban")
 
-	assert.Empty(t, env.MetricsIncreaseUserBannedCalls(), "a ban that will roll back must not be counted")
+	require.Empty(t, env.MetricsIncreaseUserBannedCalls(), "a ban that will roll back must not be counted")
 }

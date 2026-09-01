@@ -271,6 +271,27 @@ probe; `purgeauditlog` keeps one because retention `<= 0` means do nothing;
 `notifyuserbanned` keeps one because a user unbanned between the enqueue and
 the run is an answer rather than a failure.
 
+## A list field is a connection: `nodes` plus `totalCount`
+
+A field that answers with several of something returns a connection object —
+`nodes: [Thing!]!` beside `totalCount: Int64!` — never a bare list:
+
+```graphql
+type UsersConnection {
+  totalCount: Int64! @goField(forceResolver: true)
+  nodes: [AdminUser!]! @goField(forceResolver: true)
+}
+```
+
+The shape is what lets a caller ask for an aggregate without the rows —
+`users { totalCount }` renders a counter and fetches nothing else — and what
+gives a later filter, page or sum a place to live without breaking every
+existing query. A filter argument belongs on the connection field and binds
+both members: `agents(filter: …) { totalCount nodes }` counts what it lists,
+never more. A bare `[Thing!]!` hardwires "all of it, always" into every
+caller, and the day a count or a page is needed the field's type has to
+break; the connection costs two lines on day one and nothing after.
+
 ## A mutation takes one `input` and returns a union with `ErrorPayload`
 
 Both halves of the shape are the convention, and the first mutation added to a

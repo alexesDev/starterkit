@@ -97,12 +97,12 @@ func (a *app) flushAudit(ctx context.Context, entries []audit.Entry) {
 func (a *app) SignInByOIDC(ctx context.Context, input signinbyoidc.Input) (*signinbyoidc.Result, error) {
 	var result *signinbyoidc.Result
 
-	err := a.WithTransaction(ctx, func(txCtx context.Context, env *app) (bool, error) {
+	err := a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
 		var txErr error
 
 		result, txErr = signinbyoidc.Resolve(txCtx, env, input)
 
-		return txErr == nil, txErr
+		return txErr
 	})
 
 	return result, err

@@ -13,12 +13,12 @@ import (
 func runInTx[O any](ctx context.Context, a *app, fn func(context.Context, *app) (O, error)) (O, error) {
 	var out O
 
-	err := a.WithTransaction(ctx, func(txCtx context.Context, env *app) (bool, error) {
+	err := a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
 		var txErr error
 
 		out, txErr = fn(txCtx, env)
 
-		return txErr == nil, txErr
+		return txErr
 	})
 
 	return out, err

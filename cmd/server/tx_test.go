@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -56,12 +57,14 @@ func newTestApp(t *testing.T) *app {
 	return a
 }
 
+var errTestRollback = errors.New("the callback failed")
+
 func TestWithTransactionCommits(t *testing.T) {
 	a := newTestApp(t)
 
-	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) (bool, error) {
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
 		_, txErr := env.DBUpsertUserByOIDC(ctx, testUser("a"))
-		return txErr == nil, txErr
+		return txErr
 	})
 	require.NoError(t, err)
 
@@ -69,18 +72,16 @@ func TestWithTransactionCommits(t *testing.T) {
 	require.NoError(t, err, "the committed row is not visible")
 }
 
-func TestWithTransactionRollsBackWhenTheCallbackDeclinesToCommit(t *testing.T) {
+func TestWithTransactionRollsBackWhenTheCallbackFails(t *testing.T) {
 	a := newTestApp(t)
 
-	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) (bool, error) {
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
 		_, txErr := env.DBUpsertUserByOIDC(ctx, testUser("b"))
-		if txErr != nil {
-			return false, txErr
-		}
+		require.NoError(t, txErr)
 
-		return false, nil
+		return errTestRollback
 	})
-	require.NoError(t, err)
+	require.ErrorIs(t, err, errTestRollback)
 
 	_, err = a.Queries.DBGetIdentityByOIDC(t.Context(), identityOf("b"))
 	assert.True(t, db.IsNotFound(err), "the row survived a rollback: %v", err)
@@ -89,10 +90,10 @@ func TestWithTransactionRollsBackWhenTheCallbackDeclinesToCommit(t *testing.T) {
 func TestNestedWithTransactionFails(t *testing.T) {
 	a := newTestApp(t)
 
-	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) (bool, error) {
-		return false, env.WithTransaction(ctx, func(context.Context, *app) (bool, error) {
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
+		return env.WithTransaction(ctx, func(context.Context, *app) error {
 			assert.Fail(t, "the inner transaction should never run")
-			return false, nil
+			return nil
 		})
 	})
 
@@ -102,10 +103,10 @@ func TestNestedWithTransactionFails(t *testing.T) {
 func TestNestedWithTransactionFailsViaTheOuterEnv(t *testing.T) {
 	a := newTestApp(t)
 
-	err := a.WithTransaction(t.Context(), func(ctx context.Context, _ *app) (bool, error) {
-		return false, a.WithTransaction(ctx, func(context.Context, *app) (bool, error) {
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, _ *app) error {
+		return a.WithTransaction(ctx, func(context.Context, *app) error {
 			assert.Fail(t, "the inner transaction should never run")
-			return false, nil
+			return nil
 		})
 	})
 
@@ -115,11 +116,9 @@ func TestNestedWithTransactionFailsViaTheOuterEnv(t *testing.T) {
 func TestTheTransactionEnvSeesItsOwnUncommittedWrites(t *testing.T) {
 	a := newTestApp(t)
 
-	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) (bool, error) {
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
 		_, txErr := env.DBUpsertUserByOIDC(ctx, testUser("c"))
-		if txErr != nil {
-			return false, txErr
-		}
+		require.NoError(t, txErr)
 
 		_, txErr = env.Queries.DBGetIdentityByOIDC(ctx, identityOf("c"))
 		require.NoError(t, txErr, "the transaction cannot see its own write")
@@ -127,18 +126,21 @@ func TestTheTransactionEnvSeesItsOwnUncommittedWrites(t *testing.T) {
 		_, outsideErr := a.Queries.DBGetIdentityByOIDC(ctx, identityOf("c"))
 		assert.True(t, db.IsNotFound(outsideErr), "an uncommitted write is visible outside the transaction: %v", outsideErr)
 
-		return false, nil
+		return errTestRollback
 	})
-	require.NoError(t, err)
+	require.ErrorIs(t, err, errTestRollback)
 }
 
 func TestAnEnqueueInsideATransactionRollsBackWithIt(t *testing.T) {
 	a := newTestApp(t)
 
-	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) (bool, error) {
-		return false, env.EnqueueUserBannedNotice(ctx, 1)
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
+		enqueueErr := env.EnqueueUserBannedNotice(ctx, 1)
+		require.NoError(t, enqueueErr)
+
+		return errTestRollback
 	})
-	require.NoError(t, err)
+	require.ErrorIs(t, err, errTestRollback)
 
 	msg, err := a.queue.Receive(t.Context())
 	require.NoError(t, err)
@@ -148,9 +150,8 @@ func TestAnEnqueueInsideATransactionRollsBackWithIt(t *testing.T) {
 func TestAnEnqueueInsideACommittedTransactionSurvives(t *testing.T) {
 	a := newTestApp(t)
 
-	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) (bool, error) {
-		enqueueErr := env.EnqueueUserBannedNotice(ctx, 1)
-		return enqueueErr == nil, enqueueErr
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
+		return env.EnqueueUserBannedNotice(ctx, 1)
 	})
 	require.NoError(t, err)
 

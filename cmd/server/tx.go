@@ -49,7 +49,7 @@ func (a *app) withTxQueries(tx *sql.Tx) *app {
 // WithTransaction is how code with no HTTP request in scope opens one: jobs,
 // cron, boot. The write pool holds exactly one connection, so a nested BeginTx
 // would block forever waiting for the connection the outer scope already holds.
-func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app) (bool, error)) error {
+func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app) error) error {
 	if txEnv := a.txEnvFromCtx(ctx); txEnv != nil {
 		return ErrNestedTransaction
 	}
@@ -69,8 +69,8 @@ func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app
 	txEnv := a.withTxQueries(tx)
 	txCtx := context.WithValue(ctx, txEnvKeyType{}, txEnv)
 
-	commit, err := fn(txCtx, txEnv)
-	if !commit {
+	err = fn(txCtx, txEnv)
+	if err != nil {
 		return err
 	}
 
@@ -79,5 +79,5 @@ func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app
 		return fmt.Errorf("failed to commit transaction: %w", commitErr)
 	}
 
-	return err
+	return nil
 }

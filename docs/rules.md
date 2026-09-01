@@ -288,7 +288,21 @@ The shape is what lets a caller ask for an aggregate without the rows —
 gives a later filter, page or sum a place to live without breaking every
 existing query. A filter argument belongs on the connection field and binds
 both members: `agents(filter: …) { totalCount nodes }` counts what it lists,
-never more. A bare `[Thing!]!` hardwires "all of it, always" into every
+never more. The plumbing is gqlgen's `@goExtraField`, the way trip2g runs it:
+
+```graphql
+type AgentsConnection
+  @goExtraField(name: "Filter", type: "*myproject/internal/graph/model.AgentsFilterInput") {
+  totalCount: Int64! @goField(forceResolver: true)
+  nodes: [Agent!]! @goField(forceResolver: true)
+}
+```
+
+The field resolver is one line — `return &model.AgentsConnection{Filter:
+&filter}, nil` — and each member resolver reads `obj.Filter` and applies it
+to its own query. No filtering in the field resolver, no hand-written model
+struct: one generated field carries the argument down, so the count and the
+list cannot disagree. A bare `[Thing!]!` hardwires "all of it, always" into every
 caller, and the day a count or a page is needed the field's type has to
 break; the connection costs two lines on day one and nothing after.
 

@@ -352,6 +352,65 @@ so a form puts each message under the control that caused it.
 input and has no domain failure — there is nothing to reject — so it returns
 `SignOutPayload!` directly. A mutation with an input follows the shape.
 
+## The transaction boundary is the command method on `app`
+
+A transaction begins and ends in the command method on `app` — never in a
+resolver, never inside a case's `Resolve`. The resolver is a thin adapter, the
+case is pure logic against its narrow `Env`; neither knows transactions exist.
+
+The mechanism is one generic helper, `runInTx` in `cmd/server/commands.go`:
+
+```go
+func runInTx[O any](ctx context.Context, a *app, fn func(context.Context, *app) (O, error)) (O, error) {
+	var out O
+
+	err := a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
+		var txErr error
+
+		out, txErr = fn(txCtx, env)
+
+		return txErr
+	})
+
+	return out, err
+}
+```
+
+It wraps `a.WithTransaction`, committing exactly when `fn` returned no error.
+Every command method that writes wraps its case in three lines:
+
+```go
+func (a *app) BanUser(ctx context.Context, input banuser.Input) (banuser.Payload, error) {
+	return runInTx(ctx, a, func(txCtx context.Context, env *app) (banuser.Payload, error) {
+		return banuser.Resolve(txCtx, env, input)
+	})
+}
+```
+
+`banuser.Resolve` reads a user, inserts a ban, and enqueues a notice — three
+calls on its `Env` — without once mentioning a transaction. That is the point
+of the shape: the case receives the transactional `*app` as its `Env` through
+`runInTx`'s closure, so every `Env` method it calls is already inside the same
+transaction without the case ever seeing a `Tx` type. A second write added to
+the case later is atomic with the first by construction, not by remembering to
+pass anything through.
+
+The failure mode this prevents: a transaction opened in a resolver or a case
+spreads `Tx` plumbing through every signature it touches, and two cases
+composed in one request become deadlock-prone on SQLite's single writer.
+
+A case that needs no write still goes through the command method — unwrapped,
+or wrapped, as the method decides:
+
+```go
+func (a *app) ListAuditLog(ctx context.Context, limit int64, before *int64) (*listauditlog.Result, error) {
+	return listauditlog.Resolve(ctx, a, listauditlog.Input{Limit: limit, Before: before})
+}
+```
+
+The caller cannot tell the difference — which is the point: the boundary is
+invisible above `app`.
+
 ## Adding a use case
 
 1. `internal/case/<verb><noun>/resolve.go` — declare a narrow `Env` with only

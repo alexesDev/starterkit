@@ -54,9 +54,8 @@ func (a *app) EnqueueUserBannedNotice(ctx context.Context, userID int64) error {
 // typed env, so a job whose Env `app` does not satisfy will not build.
 func (a *app) registerJobs() {
 	jobs.Register(a, jobPurgeAuditLog, 0, func(ctx context.Context, _ struct{}) error {
-		return a.WithTransaction(ctx, func(txCtx context.Context, env *app) (bool, error) {
-			err := purgeauditlog.Resolve(txCtx, env)
-			return err == nil, err
+		return a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
+			return purgeauditlog.Resolve(txCtx, env)
 		})
 	})
 

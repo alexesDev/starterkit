@@ -17,6 +17,7 @@ table of where each kind of change goes. Then, as needed:
 | [docs/env-pattern.md](docs/env-pattern.md) | Before adding a use case, adding a service, or touching `app` |
 | [docs/data-layer.md](docs/data-layer.md) | Before writing SQL, a migration, or touching connections |
 | [docs/graphql.md](docs/graphql.md) | Before editing the schema or a resolver |
+| [docs/texts.md](docs/texts.md) | Before writing a sentence a person reads, or adding a language |
 | [docs/frontend-mol.md](docs/frontend-mol.md) | Before touching `assets/ui` |
 | [docs/jobs-and-cron.md](docs/jobs-and-cron.md) | Before adding background or scheduled work |
 | [docs/metrics-and-shutdown.md](docs/metrics-and-shutdown.md) | Before adding a metric or touching shutdown |
@@ -50,7 +51,12 @@ The full text, with the reasoning and the examples, is in
   parts of one rule; applying only one is worse than applying none.
 - **Nothing exists that does nothing.** Delete it in the change that noticed it.
 - **Meaning lives in types and configuration**, not in primitives and literals.
-- **Everything in English.**
+- **Everything in English**, except a sentence a person reads in another
+  language, which lives in `internal/texts`.
+- **What a person reads is a method on `texts.Catalog`**: one method per whole
+  message, named for the translator, one unexported type per language, named
+  argument types, a cupaloy snapshot of every method, and no Cyrillic literal
+  outside `internal/texts` (`gosmopolitan`).
 - **Go error style** is two lines, never inline. Multiline params go in a named
   variable. A function body goes on its own lines.
 - `errors.As`/`errors.Is`, no shadowing, `for i := range limit`, `strconv` over

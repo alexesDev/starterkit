@@ -59,6 +59,7 @@ linters:
     - gomoddirectives
     - goprintffuncname
     - gosec
+    - gosmopolitan
     - govet
     - ineffassign
     - intrange
@@ -148,6 +149,10 @@ linters:
         underef:
           skipRecvDeref: false
 
+    gosmopolitan:
+      watch-for-scripts:
+        - Cyrillic
+
     govet:
       enable-all: true
       disable:
@@ -196,6 +201,9 @@ linters:
           - goconst
           - gosec
           - noctx
+      - path: internal/texts/
+        linters:
+          - gosmopolitan
     paths:
       # adapted upstream code: dbmate's sqlite driver rebound to modernc.org/sqlite
       - internal/dbmate/sqlite/

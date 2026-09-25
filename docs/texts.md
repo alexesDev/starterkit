@@ -384,6 +384,28 @@ require.Equal(t, texts.Russian().SeatPromptSpent(), fake.answered[0])
 
 A rewording then touches `russian.go` and the snapshot, and no other test.
 
+Some tests care which text was chosen, not how it is worded. A refusal must
+answer `SeatNotAllowed` and not `SeatUnknownAgent`, whatever either says this
+year. For those, `texts` gains a second implementation, `Echo()`, that renders
+the method's name and its arguments:
+
+```go
+func Echo() Catalog {
+	return echo{}
+}
+
+type echo struct{}
+
+func (echo) SeatConfirmed(agent AgentName) string {
+	return "SeatConfirmed(" + string(agent) + ")"
+}
+```
+
+The test hands `texts.Echo` to the fake instead of `texts.Russian`, and then
+asserts `"SeatConfirmed(alice)"`. `echo` implements `Catalog`, so it does not
+build until it has every method, the same check every language gets. Add it
+with the first test that needs it, and not before.
+
 ## The guard
 
 The kit's `.golangci.yaml` turns on `gosmopolitan`, watching for Cyrillic, and

@@ -218,7 +218,7 @@ func (russian) ReembedQueued(windows WindowCount) string {
 		Many: n + " окон встанут в очередь и получат новый вектор",
 	}
 
-	return "Векторы сброшены: " + queued.For(int64(windows)) + "."
+	return "Векторы сброшены: " + queued.Of(int64(windows)) + "."
 }
 
 type russianPlural struct {
@@ -227,7 +227,7 @@ type russianPlural struct {
 	Many string
 }
 
-func (p russianPlural) For(n int64) string {
+func (p russianPlural) Of(n int64) string {
 	lastTwoDigits := int(n % 100)
 
 	if lastTwoDigits < 0 {
@@ -262,10 +262,10 @@ a negative number (measured at -1 and -5), and a count that is a difference can
 be negative. CLDR picks the form from the absolute value, and Russian's rule
 reads only its last digit and its last two digits (`i % 10`, `i % 100`). So the
 helper passes the absolute value of the last two digits. That gives the same
-form as the whole number, measured against `MatchPlural` for every value from
--200000 to 200000, and it holds for every `int64`. Taking the absolute value of
-the whole number would not: `-math.MinInt64` overflows back to itself, and
-`MatchPlural` panics on it (measured).
+form as `MatchPlural` gives the absolute value, for every value from 0 to
+200000 and its negative (measured), and it holds for every `int64`. Taking the
+absolute value of the whole number would not: `-math.MinInt64` overflows back
+to itself, and `MatchPlural` panics on it (measured).
 
 It is two `if`s and not a `switch` because the kit's `exhaustive` does not
 count a default. A `switch` with `One`, `Few` and a default was reported for
@@ -395,6 +395,7 @@ linters:
     - gosmopolitan
   settings:
     gosmopolitan:
+      allow-time-local: true
       watch-for-scripts:
         - Cyrillic
   exclusions:
@@ -409,6 +410,10 @@ configuration and not a new tool. Measured: it flagged a Cyrillic literal in a
 package outside `internal/texts` and in that package's test, and it passed the
 `russian.go` above. A test that compares against a literal is caught along with
 the call site that returns one.
+
+`allow-time-local: true` keeps the linter to scripts. Left at its default, it
+also reports every use of `time.Local` (measured), and that is a rule about
+time zones this page does not make.
 
 It reads string literals only; a rune literal such as `'ё'` is not checked.
 Some Cyrillic strings are not texts, such as a user's message in a fixture.
@@ -453,16 +458,11 @@ flag nobody selects.
    ```
 
    The two lists are in the same order, and that order is the whole contract of
-   `index`. What was measured:
-
-   - An empty code, `de` and `uk` go to the fallback.
-   - `en-US` goes to English.
-   - `be` and `kk` go to Russian even when the fallback is English. That
-     follows CLDR's own matching data.
+   `index`. The matcher follows CLDR's matching data, so `be` and `kk` land on
+   Russian even when the fallback is English. Measure it again in that change.
 3. The deployment's default language is one setting, typed `language.Tag` and
-   parsed at boot. Boot refuses a tag that has no type. Given a fallback it does
-   not know, the matcher silently returns the first language in its list
-   (measured with German).
+   parsed at boot. Boot refuses a tag that has no type, because the matcher
+   silently answers an unknown fallback with the first language in its list.
 4. `Texts()` on the `Env` keeps its signature and means the deployment default.
    `TextsFor(code string) texts.Catalog` is added for a text that only one
    person reads.
@@ -495,7 +495,7 @@ reader's language matters, send a code and render the sentence where it is
 read. Moving rendering from one service to another is a boundary change and is
 decided on its own.
 
-**Fractions.** `russianPlural.For` takes whole numbers. Russian's `other` form
+**Fractions.** `russianPlural.Of` takes whole numbers. Russian's `other` form
 exists only for fractions, so a fractional quantity needs its own helper.
 
 **Check a template at build time.** `html/template` resolves

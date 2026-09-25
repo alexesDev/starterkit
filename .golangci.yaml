@@ -150,6 +150,7 @@ linters:
           skipRecvDeref: false
 
     gosmopolitan:
+      allow-time-local: true
       watch-for-scripts:
         - Cyrillic
 

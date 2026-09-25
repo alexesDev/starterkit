@@ -205,8 +205,9 @@ and stay in English.
   `internal/texts`, tests included.
 
 There are no message files, no string keys, no generate step and no global
-catalog. A second language arrives with its own type, `For(code)` and a
-default-language setting, all in one change and none of it before.
+catalog. A second language arrives with its own type, a `For` that picks the
+catalog for a reader, and a default-language setting, all in one change and
+none of it before.
 
 The worked example, the plural helper, the test and the reasons are in
 [texts.md](texts.md).

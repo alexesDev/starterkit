@@ -11,6 +11,7 @@ Why things are the way they are. Start here, in this order.
 | [graphql.md](graphql.md) | Schema conventions, the admin namespace, transactional mutations |
 | [frontend-mol.md](frontend-mol.md) | The $mol SPA, the codegen bridge, the build |
 | [jobs-and-cron.md](jobs-and-cron.md) | The SQLite-backed queue and the scheduler |
+| [texts.md](texts.md) | What a service says to a person: the typed catalog, plurals, the snapshot, the Cyrillic guard |
 | [auth-dex.md](auth-dex.md) | OIDC through the gate, bans, the audit log, corporate IdPs |
 | [traefik-forward-auth.md](traefik-forward-auth.md) | The gate in front of the panel |
 | [metrics-and-shutdown.md](metrics-and-shutdown.md) | Prometheus, and draining without dropping requests |

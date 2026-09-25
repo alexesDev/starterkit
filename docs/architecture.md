@@ -69,6 +69,7 @@ mechanism and the failure modes the pattern has in practice, is in
 | A background job | `internal/case/<name>/` + a line in `cmd/server/jobs.go` |
 | A scheduled job | a line in `cmd/server/cron.go` |
 | An external service client | `internal/<service>/`, then embed it into `app` |
+| A sentence a person reads | a method on `Catalog` and on each language type in `internal/texts/` |
 
 ## Conventions that are load-bearing
 

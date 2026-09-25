@@ -178,7 +178,39 @@ misleading signature can only be fixed by naming it.
 
 ## Everything in English
 
-Code, comments, docs, commit messages, UI copy.
+Code, comments, docs, commit messages, the panel's UI copy. The one exception
+is a sentence a service says to a person in another language, and it lives in
+`internal/texts` (below).
+
+## What a person reads lives in `internal/texts`
+
+Every sentence a service says to a person is a method on `texts.Catalog`: a
+chat message, a button label, a web page, an email body. Each language is an
+unexported type that implements `Catalog`, and `texts.Russian()` returns one.
+Code that speaks declares `Texts() texts.Catalog` on its `Env`, and `app`
+answers it. Log lines, errors, metric labels and audit details are not texts
+and stay in English.
+
+- One method is one whole message. The call site never joins a text to
+  anything, because word order belongs to the language.
+- The method name is the translator's note: `<Surface><Situation>`, in English,
+  and exact. `SeatPromptSpent`, not `SeatAlreadyTaken`.
+- Every value a sentence mentions is a parameter of a named type declared in
+  `texts`, counts included.
+- A plural is a `russianPlural` of whole phrases, picked by
+  `golang.org/x/text/feature/plural`, and it never panics on a negative count.
+- `TestRussian` calls every method and snapshots what it said with cupaloy. A
+  method left out of the test fails it by name.
+- `gosmopolitan` fails the lint on a Cyrillic string literal outside
+  `internal/texts`, tests included.
+
+There are no message files, no string keys, no generate step and no global
+catalog. A second language arrives with its own type, a `For` that picks the
+catalog for a reader, and a default-language setting, all in one change and
+none of it before.
+
+The worked example, the plural helper, the test and the reasons are in
+[texts.md](texts.md).
 
 ## Go error style
 

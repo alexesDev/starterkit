@@ -4,6 +4,9 @@ The SPA is [$mol](https://mol.hyoo.ru). It talks to one GraphQL endpoint through
 generated, typed wrappers — no fetch calls written by hand, no client cache to
 configure.
 
+This page is how the SPA is built. What a screen, a menu and an action should
+look like is in [mol-interface-design.md](mol-interface-design.md).
+
 ## Layout
 
 ```

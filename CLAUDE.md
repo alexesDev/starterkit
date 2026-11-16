@@ -19,6 +19,7 @@ table of where each kind of change goes. Then, as needed:
 | [docs/graphql.md](docs/graphql.md) | Before editing the schema or a resolver |
 | [docs/texts.md](docs/texts.md) | Before writing a sentence a person reads, or adding a language |
 | [docs/frontend-mol.md](docs/frontend-mol.md) | Before touching `assets/ui` |
+| [docs/mol-interface-design.md](docs/mol-interface-design.md) | Before designing or reviewing a screen — the first page, a list row, an item page and where its actions go |
 | [docs/jobs-and-cron.md](docs/jobs-and-cron.md) | Before adding background or scheduled work |
 | [docs/metrics-and-shutdown.md](docs/metrics-and-shutdown.md) | Before adding a metric or touching shutdown |
 | [docs/behavioural-testing.md](docs/behavioural-testing.md) | Before changing e2e or the snapshot baseline |

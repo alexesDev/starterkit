@@ -345,8 +345,8 @@ namespace.
 
 A case earns its package when it has something to decide: validation, an
 ordering, a fallback, more than one write, a domain failure worth naming.
-`listauditlog` keeps one because it clamps the limit and runs the `limit + 1`
-probe; `purgeauditlog` keeps one because retention `<= 0` means do nothing;
+`listauditlog` keeps one because it turns the page arguments into a keyset
+query and cuts the probe row off the answer; `purgeauditlog` keeps one because retention `<= 0` means do nothing;
 `notifyuserbanned` keeps one because a user unbanned between the enqueue and
 the run is an answer rather than a failure.
 
@@ -392,30 +392,39 @@ A field that answers with several of something returns a connection object —
 ```graphql
 type UsersConnection {
   totalCount: Int64! @goField(forceResolver: true)
-  nodes: [AdminUser!]! @goField(forceResolver: true)
+  nodes: [AdminUser!]!
+  pageInfo: PageInfo!
+}
+
+type AdminQuery {
+  users(first: Int64 = 50, after: Cursor): UsersConnection!
 }
 ```
 
-The shape is what lets a caller ask for an aggregate without the rows —
-`users { totalCount }` renders a counter and fetches nothing else — and what
-gives a later filter, page or sum a place to live without breaking every
-existing query. A filter argument belongs on the connection field and binds
-both members: `agents(filter: …) { totalCount nodes }` counts what it lists,
-never more. The plumbing is gqlgen's `@goExtraField`, the way trip2g runs it:
+The shape is what lets a caller pay for the count only when it shows one —
+`totalCount` is a forced resolver, so a page that only scrolls never runs
+`count(*)` — and what gives a later filter or sum a place to live without
+breaking every existing query. `nodes` and `pageInfo` come from one keyset
+query: the field resolver runs the list case with `first` and `after`, and
+`internal/page` cuts the probe row and fills `pageInfo`.
+
+A filter argument belongs on the connection field and binds both the page and
+the count: `agents(filter: …) { totalCount nodes }` counts what it lists,
+never more. The plumbing is gqlgen's `@goExtraField`:
 
 ```graphql
 type AgentsConnection
   @goExtraField(name: "Filter", type: "*myproject/internal/graph/model.AgentsFilterInput") {
   totalCount: Int64! @goField(forceResolver: true)
-  nodes: [Agent!]! @goField(forceResolver: true)
+  nodes: [Agent!]!
+  pageInfo: PageInfo!
 }
 ```
 
-The field resolver is one line — `return &model.AgentsConnection{Filter:
-&filter}, nil` — and each member resolver reads `obj.Filter` and applies it
-to its own query. No filtering in the field resolver, no hand-written model
-struct: one generated field carries the argument down, so the count and the
-list cannot disagree. A bare `[Thing!]!` hardwires "all of it, always" into every
+The list case applies the filter to its page and leaves it on the connection's
+`Filter` field, and the `totalCount` resolver reads `obj.Filter` and applies it
+to its own query. One generated field carries the argument down, so the count
+and the list cannot disagree. A bare `[Thing!]!` hardwires "all of it, always" into every
 caller, and the day a count or a page is needed the field's type has to
 break; the connection costs two lines on day one and nothing after.
 
@@ -516,8 +525,8 @@ A case that needs no write still goes through the command method — unwrapped,
 or wrapped, as the method decides:
 
 ```go
-func (a *app) ListAuditLog(ctx context.Context, limit int64, before *int64) (*listauditlog.Result, error) {
-	return listauditlog.Resolve(ctx, a, listauditlog.Input{Limit: limit, Before: before})
+func (a *app) ListAuditLog(ctx context.Context, input listauditlog.Input) (*listauditlog.Result, error) {
+	return listauditlog.Resolve(ctx, a, input)
 }
 ```
 

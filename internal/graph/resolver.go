@@ -12,7 +12,9 @@ import (
 	"starterkit/internal/audit"
 	"starterkit/internal/buildinfo"
 	"starterkit/internal/case/banuser"
+	"starterkit/internal/case/listadmins"
 	"starterkit/internal/case/listauditlog"
+	"starterkit/internal/case/listusers"
 	"starterkit/internal/case/makeadmin"
 	"starterkit/internal/case/removeadmin"
 	"starterkit/internal/case/unbanuser"
@@ -20,6 +22,8 @@ import (
 	"starterkit/internal/logger"
 	"starterkit/internal/model"
 )
+
+//go:generate go tool github.com/matryer/moq -out mocks_test.go -pkg graph_test . Env
 
 type Resolver struct {
 	Env Env
@@ -32,13 +36,14 @@ type Env interface {
 	UnbanUser(ctx context.Context, input unbanuser.Input) (unbanuser.Payload, error)
 	MakeAdmin(ctx context.Context, input makeadmin.Input) (makeadmin.Payload, error)
 	RemoveAdmin(ctx context.Context, input removeadmin.Input) (removeadmin.Payload, error)
-	ListAuditLog(ctx context.Context, limit int64, before *int64) (*listauditlog.Result, error)
+	ListAuditLog(ctx context.Context, input listauditlog.Input) (*listauditlog.Result, error)
+	ListUsers(ctx context.Context, input listusers.Input) (*listusers.Result, error)
+	ListAdmins(ctx context.Context, input listadmins.Input) (*listadmins.Result, error)
 
-	DBListUsers(ctx context.Context) ([]db.DBListUsersRow, error)
 	DBCountUsers(ctx context.Context) (int64, error)
 	DBGetAdminUserByID(ctx context.Context, id int64) (db.DBGetAdminUserByIDRow, error)
-	DBListAdmins(ctx context.Context) ([]db.DBListAdminsRow, error)
 	DBCountAdmins(ctx context.Context) (int64, error)
+	DBCountAuditLog(ctx context.Context) (int64, error)
 
 	RecordSignOut(ctx context.Context)
 	SignOutURL() string

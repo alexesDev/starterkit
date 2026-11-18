@@ -93,7 +93,7 @@ assets/ui/users/catalog/list.graphql ->  $starterkit_users_catalog_list(vars?)
 ```ts
 @$mol_mem
 data() {
-    return $starterkit_gql_make_map($starterkit_users_catalog_list().admin.users.nodes)
+    return $starterkit_gql_make_map($starterkit_users_catalog_list({ first: 50, after: null }).admin.users.nodes)
 }
 ```
 
@@ -143,15 +143,21 @@ paging() {
     return new (class extends $starterkit_paging<Entry> {
         override page_size() { return view.page_size() }
 
-        override fetch(before: number | null) {
-            return $starterkit_auditlog_list({ limit: this.page_size(), before }).admin.auditLog
+        override fetch(after: string | null) {
+            return $starterkit_auditlog_list({ first: this.page_size(), after }).admin.auditLog
         }
     })()
 }
 ```
 
 The base owns the cursor list, memoises each page by the cursor it started from,
-concatenates them, and answers `has_next()` / `more()`. `@$mol_mem` on the
+concatenates them, and answers `has_next()` / `more()`: `more()` appends the
+last page's `endCursor`, an opaque string the screen never reads. It does not
+ask for `totalCount` — a screen that shows a total selects it in its own
+query, and a screen that only scrolls never pays for the count. The audit log
+puts `Show more` under its list; the users catalog puts it under the menu
+links, and opens any user by id from the URL whether or not their page has
+been loaded yet. `@$mol_mem` on the
 instance means a page already fetched is not fetched again, while the shared
 invalidation marker still refetches everything after a mutation.
 
@@ -165,7 +171,7 @@ type Entry = ReturnType<typeof $starterkit_auditlog_list>['admin']['auditLog']['
 ```
 
 One shape detail worth knowing: codegen types a nullable GraphQL field as
-*optional* (`endCursor?: number | null`), so `$starterkit_paging_page` declares
+*optional* (`endCursor?: string | null`), so `$starterkit_paging_page` declares
 it optional too. Declaring it merely nullable makes the generated result
 unassignable, and the error is a wall of structural-mismatch text.
 

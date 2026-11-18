@@ -19,6 +19,7 @@ import (
 	"starterkit/internal/logger"
 	"starterkit/internal/metrics"
 	"starterkit/internal/notifier"
+	"starterkit/internal/page"
 )
 
 const prefix = "STARTERKIT_"
@@ -42,6 +43,7 @@ type Config struct {
 	Proxies  clientip.Config
 	Metrics  metrics.Config
 	Log      logger.Config
+	Page     page.Limits
 	Shutdown Shutdown
 }
 
@@ -81,6 +83,7 @@ func Parse(args, environ []string) (*Config, error) {
 	cfg.Proxies.Register(r)
 	cfg.Metrics.Register(r)
 	cfg.Log.Register(r)
+	cfg.Page.Register(r)
 	cfg.Shutdown.Register(r)
 
 	r.Parse(args)
@@ -90,6 +93,7 @@ func Parse(args, environ []string) (*Config, error) {
 	cfg.Audit.Check(r)
 	cfg.Notifier.Check(r)
 	cfg.Metrics.Check(r)
+	cfg.Page.Check(r)
 
 	return cfg, r.Err()
 }

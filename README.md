@@ -102,11 +102,9 @@ not per type. Three kinds of divergence, all of them real in this kit:
   behind it is SQLite's `0`/`1`. `@goField(forceResolver: true)` and a one-line
   resolver in `internal/graph/schema.resolvers.go` do the conversion:
   `return obj.IsAdmin != 0, nil`.
-- **Deferred to another query.** `UsersConnection.totalCount` and `nodes` are
-  both forced resolvers over an empty marker struct, so a client asking for
-  `nodes` alone never pays for the `count(*)`. `AdminsConnection` works the
-  same way. `auditLog` does not: it is a page, and `listauditlog` counts the
-  whole table on every call.
+- **Deferred to another query.** `totalCount` on every connection is a forced
+  resolver, so a client asking for `nodes` alone never pays for the
+  `count(*)`.
 - **Given behaviour.** Every time column binds to `dbtime.Stamp`, and the
   `Timestamp` object type resolves its fields to methods on it, so `formatted`
   and `unix` exist on every timestamp in the API without a resolver anywhere.
@@ -166,7 +164,7 @@ want gone first, in that order:
    design; the kit is under the token threshold with five commands and a project
    with thirty will not be.
 4. **`funlen` / `cyclop` / `gocognit`** — composition roots are the pressure
-   point. `appconfig.Parse` registers every service in one place and `run` is 86 lines, both well inside
+   point. `appconfig.Get` is already 60 lines and `run` is 86, both well inside
    the limits but both the kind of function that only grows.
 5. **`depguard`** — its denylist is this project's, not yours.
 
@@ -227,9 +225,7 @@ anything real), and the bootstrap rule promotes that account to admin because
 
 ## Where to read next
 
-[docs/architecture.md](docs/architecture.md) is the map,
-[docs/architecture-explained.md](docs/architecture-explained.md) walks a request
-and a job through every layer and says what each choice costs, and
+[docs/architecture.md](docs/architecture.md) is the map, and
 [docs/README.md](docs/README.md) is the index. The one idea worth internalising
 before touching anything is in [docs/env-pattern.md](docs/env-pattern.md), which
 is this kit's operational version of

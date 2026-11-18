@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"starterkit/internal/db"
+	"starterkit/internal/page"
 	"strconv"
 )
 
@@ -29,6 +30,13 @@ type UnbanUserOrErrorPayload interface {
 type AdminsConnection struct {
 	TotalCount int64                `json:"totalCount"`
 	Nodes      []db.DBListAdminsRow `json:"nodes"`
+	PageInfo   *page.Info           `json:"pageInfo"`
+}
+
+type AuditLogConnection struct {
+	TotalCount int64         `json:"totalCount"`
+	Nodes      []db.AuditLog `json:"nodes"`
+	PageInfo   *page.Info    `json:"pageInfo"`
 }
 
 type BanUserInput struct {
@@ -103,6 +111,7 @@ func (UnbanUserPayload) IsUnbanUserOrErrorPayload() {}
 type UsersConnection struct {
 	TotalCount int64               `json:"totalCount"`
 	Nodes      []db.DBListUsersRow `json:"nodes"`
+	PageInfo   *page.Info          `json:"pageInfo"`
 }
 
 type ViewerRole string

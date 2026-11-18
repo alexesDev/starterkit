@@ -193,7 +193,6 @@ type Env interface {
 	// ...
 
 	// Plain reads sit here directly.
-	DBListUsers(ctx context.Context) ([]db.DBListUsersRow, error)
 	DBCountUsers(ctx context.Context) (int64, error)
 }
 ```
@@ -259,7 +258,7 @@ against the transaction already holding it.
 
 A case package earns its place when there is a decision in it: validation, a
 permission rule beyond the admin boundary, several writes that must agree,
-something to emit. `DBListUsers` has none of that, so it goes on `graph.Env` and
+something to emit. `DBCountUsers` has none of that, so it goes on `graph.Env` and
 the resolver calls it. A `Resolve` that only forwards to one query and wraps the
 error is a layer, not a use case — and it costs a package, a second `Env`, a
 generated mock and a test that asserts the mock was called.

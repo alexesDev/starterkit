@@ -55,6 +55,7 @@ on it without a cycle. A check that relates two services stays in
 | `clientip` | `trusted-proxies` |
 | `metrics` | `metrics-addr`, `metrics-interval` |
 | `logger` | `log-level` |
+| `page` | `page-default`, `page-max` |
 
 `go run ./cmd/server --help` prints the full list, each line with its variable.
 

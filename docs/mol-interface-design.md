@@ -341,7 +341,9 @@ breaks it into paragraphs. A `$mol_view` with a string in `sub` renders one
 line. Machine output goes in a `pre`. A long list pages with an explicit
 control. A truncated log says it is truncated.
 
-- In this kit: `assets/ui/auditlog/auditlog.view.tree` pages with `Show more`.
+- In this kit: `assets/ui/auditlog/auditlog.view.tree` pages with `Show more`
+  under its list, and `assets/ui/users/catalog` under the menu links, both
+  through the shared `$starterkit_paging` fed by `endCursor`.
   The kit shows no long text yet.
 - Standing: `house rule` for the line breaks, decided for one page;
   `observed in this kit` for the paging; the rest `inferred`.

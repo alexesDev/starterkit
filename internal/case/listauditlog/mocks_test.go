@@ -7,6 +7,7 @@ import (
 	"context"
 	"starterkit/internal/case/listauditlog"
 	"starterkit/internal/db"
+	"starterkit/internal/page"
 	"sync"
 )
 
@@ -20,11 +21,11 @@ var _ listauditlog.Env = &EnvMock{}
 //
 //		// make and configure a mocked listauditlog.Env
 //		mockedEnv := &EnvMock{
-//			DBCountAuditLogFunc: func(ctx context.Context) (int64, error) {
-//				panic("mock out the DBCountAuditLog method")
-//			},
 //			DBListAuditLogFunc: func(ctx context.Context, arg db.DBListAuditLogParams) ([]db.AuditLog, error) {
 //				panic("mock out the DBListAuditLog method")
+//			},
+//			PageLimitsFunc: func() page.Limits {
+//				panic("mock out the PageLimits method")
 //			},
 //		}
 //
@@ -33,19 +34,14 @@ var _ listauditlog.Env = &EnvMock{}
 //
 //	}
 type EnvMock struct {
-	// DBCountAuditLogFunc mocks the DBCountAuditLog method.
-	DBCountAuditLogFunc func(ctx context.Context) (int64, error)
-
 	// DBListAuditLogFunc mocks the DBListAuditLog method.
 	DBListAuditLogFunc func(ctx context.Context, arg db.DBListAuditLogParams) ([]db.AuditLog, error)
 
+	// PageLimitsFunc mocks the PageLimits method.
+	PageLimitsFunc func() page.Limits
+
 	// calls tracks calls to the methods.
 	calls struct {
-		// DBCountAuditLog holds details about calls to the DBCountAuditLog method.
-		DBCountAuditLog []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 		// DBListAuditLog holds details about calls to the DBListAuditLog method.
 		DBListAuditLog []struct {
 			// Ctx is the ctx argument value.
@@ -53,41 +49,12 @@ type EnvMock struct {
 			// Arg is the arg argument value.
 			Arg db.DBListAuditLogParams
 		}
+		// PageLimits holds details about calls to the PageLimits method.
+		PageLimits []struct {
+		}
 	}
-	lockDBCountAuditLog sync.RWMutex
-	lockDBListAuditLog  sync.RWMutex
-}
-
-// DBCountAuditLog calls DBCountAuditLogFunc.
-func (mock *EnvMock) DBCountAuditLog(ctx context.Context) (int64, error) {
-	if mock.DBCountAuditLogFunc == nil {
-		panic("EnvMock.DBCountAuditLogFunc: method is nil but Env.DBCountAuditLog was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	mock.lockDBCountAuditLog.Lock()
-	mock.calls.DBCountAuditLog = append(mock.calls.DBCountAuditLog, callInfo)
-	mock.lockDBCountAuditLog.Unlock()
-	return mock.DBCountAuditLogFunc(ctx)
-}
-
-// DBCountAuditLogCalls gets all the calls that were made to DBCountAuditLog.
-// Check the length with:
-//
-//	len(mockedEnv.DBCountAuditLogCalls())
-func (mock *EnvMock) DBCountAuditLogCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	mock.lockDBCountAuditLog.RLock()
-	calls = mock.calls.DBCountAuditLog
-	mock.lockDBCountAuditLog.RUnlock()
-	return calls
+	lockDBListAuditLog sync.RWMutex
+	lockPageLimits     sync.RWMutex
 }
 
 // DBListAuditLog calls DBListAuditLogFunc.
@@ -123,5 +90,32 @@ func (mock *EnvMock) DBListAuditLogCalls() []struct {
 	mock.lockDBListAuditLog.RLock()
 	calls = mock.calls.DBListAuditLog
 	mock.lockDBListAuditLog.RUnlock()
+	return calls
+}
+
+// PageLimits calls PageLimitsFunc.
+func (mock *EnvMock) PageLimits() page.Limits {
+	if mock.PageLimitsFunc == nil {
+		panic("EnvMock.PageLimitsFunc: method is nil but Env.PageLimits was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockPageLimits.Lock()
+	mock.calls.PageLimits = append(mock.calls.PageLimits, callInfo)
+	mock.lockPageLimits.Unlock()
+	return mock.PageLimitsFunc()
+}
+
+// PageLimitsCalls gets all the calls that were made to PageLimits.
+// Check the length with:
+//
+//	len(mockedEnv.PageLimitsCalls())
+func (mock *EnvMock) PageLimitsCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockPageLimits.RLock()
+	calls = mock.calls.PageLimits
+	mock.lockPageLimits.RUnlock()
 	return calls
 }

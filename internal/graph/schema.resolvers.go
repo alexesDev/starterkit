@@ -14,6 +14,7 @@ import (
 	"starterkit/internal/graph/generated"
 	"starterkit/internal/graph/model"
 	model1 "starterkit/internal/model"
+	"starterkit/internal/page"
 
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -39,8 +40,8 @@ func (r *adminMutationResolver) RemoveAdmin(ctx context.Context, obj *model1.Adm
 }
 
 // Users is the resolver for the users field.
-func (r *adminQueryResolver) Users(ctx context.Context, obj *model1.AdminQuery) (*model.UsersConnection, error) {
-	return &model.UsersConnection{}, nil
+func (r *adminQueryResolver) Users(ctx context.Context, obj *model1.AdminQuery, first *int64, after *page.Cursor) (*model.UsersConnection, error) {
+	return r.Env.ListUsers(ctx, page.Args{First: first, After: after})
 }
 
 // User is the resolver for the user field.
@@ -60,13 +61,13 @@ func (r *adminQueryResolver) User(ctx context.Context, obj *model1.AdminQuery, i
 }
 
 // Admins is the resolver for the admins field.
-func (r *adminQueryResolver) Admins(ctx context.Context, obj *model1.AdminQuery) (*model.AdminsConnection, error) {
-	return &model.AdminsConnection{}, nil
+func (r *adminQueryResolver) Admins(ctx context.Context, obj *model1.AdminQuery, first *int64, after *page.Cursor) (*model.AdminsConnection, error) {
+	return r.Env.ListAdmins(ctx, page.Args{First: first, After: after})
 }
 
 // AuditLog is the resolver for the auditLog field.
-func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, limit int64, before *int64) (*model.AuditLogConnection, error) {
-	return r.Env.ListAuditLog(ctx, limit, before)
+func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, first *int64, after *page.Cursor) (*model.AuditLogConnection, error) {
+	return r.Env.ListAuditLog(ctx, page.Args{First: first, After: after})
 }
 
 // Build is the resolver for the build field.
@@ -91,14 +92,14 @@ func (r *adminsConnectionResolver) TotalCount(ctx context.Context, obj *model.Ad
 	return count, nil
 }
 
-// Nodes is the resolver for the nodes field.
-func (r *adminsConnectionResolver) Nodes(ctx context.Context, obj *model.AdminsConnection) ([]db.DBListAdminsRow, error) {
-	rows, err := r.Env.DBListAdmins(ctx)
+// TotalCount is the resolver for the totalCount field.
+func (r *auditLogConnectionResolver) TotalCount(ctx context.Context, obj *model.AuditLogConnection) (int64, error) {
+	count, err := r.Env.DBCountAuditLog(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list admins: %w", err)
+		return 0, fmt.Errorf("failed to count audit log: %w", err)
 	}
 
-	return rows, nil
+	return count, nil
 }
 
 // SignOut is the resolver for the signOut field.
@@ -144,16 +145,6 @@ func (r *usersConnectionResolver) TotalCount(ctx context.Context, obj *model.Use
 	return count, nil
 }
 
-// Nodes is the resolver for the nodes field.
-func (r *usersConnectionResolver) Nodes(ctx context.Context, obj *model.UsersConnection) ([]db.DBListUsersRow, error) {
-	rows, err := r.Env.DBListUsers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list users: %w", err)
-	}
-
-	return rows, nil
-}
-
 // User is the resolver for the user field.
 func (r *viewerResolver) User(ctx context.Context, obj *model1.Viewer) (*db.User, error) {
 	return r.Env.CurrentUser(ctx), nil
@@ -187,6 +178,11 @@ func (r *Resolver) AdminsConnection() generated.AdminsConnectionResolver {
 	return &adminsConnectionResolver{r}
 }
 
+// AuditLogConnection returns generated.AuditLogConnectionResolver implementation.
+func (r *Resolver) AuditLogConnection() generated.AuditLogConnectionResolver {
+	return &auditLogConnectionResolver{r}
+}
+
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
@@ -202,12 +198,13 @@ func (r *Resolver) UsersConnection() generated.UsersConnectionResolver {
 func (r *Resolver) Viewer() generated.ViewerResolver { return &viewerResolver{r} }
 
 type (
-	adminMutationResolver    struct{ *Resolver }
-	adminQueryResolver       struct{ *Resolver }
-	adminUserResolver        struct{ *Resolver }
-	adminsConnectionResolver struct{ *Resolver }
-	mutationResolver         struct{ *Resolver }
-	queryResolver            struct{ *Resolver }
-	usersConnectionResolver  struct{ *Resolver }
-	viewerResolver           struct{ *Resolver }
+	adminMutationResolver      struct{ *Resolver }
+	adminQueryResolver         struct{ *Resolver }
+	adminUserResolver          struct{ *Resolver }
+	adminsConnectionResolver   struct{ *Resolver }
+	auditLogConnectionResolver struct{ *Resolver }
+	mutationResolver           struct{ *Resolver }
+	queryResolver              struct{ *Resolver }
+	usersConnectionResolver    struct{ *Resolver }
+	viewerResolver             struct{ *Resolver }
 )

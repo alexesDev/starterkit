@@ -32,23 +32,39 @@ export interface AuditLogEntry {
 }
 
 const AUDIT_LOG_QUERY = `
-	query E2eAuditLog($limit: Int64!) {
+	query E2eAuditLog($first: Int64!, $after: Cursor) {
 		admin {
-			auditLog(limit: $limit) {
-				totalCount
+			auditLog(first: $first, after: $after) {
+				pageInfo { hasNextPage endCursor }
 				nodes { id userId email action detail ip createdAt { unix } }
 			}
 		}
 	}
 `;
 
-export async function fetchWholeAuditLog(adminApi: APIRequestContext): Promise<AuditLogEntry[]> {
-	const result = await gql(adminApi, AUDIT_LOG_QUERY, { limit: 500 });
-	if (result.errors?.length) {
-		throw new Error(`fetchWholeAuditLog: ${result.errors.map((e) => e.message).join('; ')}`);
-	}
+export async function fetchAuditLogNewestFirst(adminApi: APIRequestContext, pageSize: number): Promise<AuditLogEntry[]> {
+	const nodes: AuditLogEntry[] = [];
+	let after: string | null = null;
 
-	const nodes: AuditLogEntry[] = result.data.admin.auditLog.nodes;
+	for (;;) {
+		const result = await gql(adminApi, AUDIT_LOG_QUERY, { first: pageSize, after });
+		if (result.errors?.length) {
+			throw new Error(`fetchAuditLogNewestFirst: ${result.errors.map((e) => e.message).join('; ')}`);
+		}
+
+		const page = result.data.admin.auditLog;
+		nodes.push(...page.nodes);
+
+		if (!page.pageInfo.hasNextPage) {
+			return nodes;
+		}
+
+		after = page.pageInfo.endCursor;
+	}
+}
+
+export async function fetchWholeAuditLog(adminApi: APIRequestContext): Promise<AuditLogEntry[]> {
+	const nodes = await fetchAuditLogNewestFirst(adminApi, 500);
 	return [...nodes].reverse();
 }
 

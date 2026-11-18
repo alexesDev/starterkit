@@ -1,8 +1,12 @@
 $starterkit_users_catalog $starterkit_catalog
 	param \user
 	menu_title \Users
+	page_size 50
 	Show_page* $starterkit_users_show
-		user_id <= row_id* 0
+		user_id <= show_user_id* 0
+	More $mol_button_minor
+		title \Show more
+		click? <=> more? null
 	menu_link_content* /
 		<= User_item* $mol_view
 			sub /

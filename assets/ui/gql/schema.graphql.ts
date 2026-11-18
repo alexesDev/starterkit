@@ -15,6 +15,7 @@ export type Scalars = {
   Boolean: { input: boolean; output: boolean; }
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
+  Cursor: { input: string; output: string; }
   Int64: { input: number; output: number; }
 };
 
@@ -64,14 +65,26 @@ export type AdminQuery = {
 };
 
 
+export type AdminQueryadminsArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  first?: InputMaybe<Scalars['Int64']['input']>;
+};
+
+
 export type AdminQueryauditLogArgs = {
-  before?: InputMaybe<Scalars['Int64']['input']>;
-  limit?: Scalars['Int64']['input'];
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  first?: InputMaybe<Scalars['Int64']['input']>;
 };
 
 
 export type AdminQueryuserArgs = {
   id: Scalars['Int64']['input'];
+};
+
+
+export type AdminQueryusersArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  first?: InputMaybe<Scalars['Int64']['input']>;
 };
 
 export type AdminUser = {
@@ -88,6 +101,7 @@ export type AdminUser = {
 export type AdminsConnection = {
   __typename?: 'AdminsConnection';
   nodes: Array<Admin>;
+  pageInfo: PageInfo;
   totalCount: Scalars['Int64']['output'];
 };
 
@@ -159,7 +173,7 @@ export type Mutation = {
 
 export type PageInfo = {
   __typename?: 'PageInfo';
-  endCursor?: Maybe<Scalars['Int64']['output']>;
+  endCursor?: Maybe<Scalars['Cursor']['output']>;
   hasNextPage: Scalars['Boolean']['output'];
 };
 
@@ -218,6 +232,7 @@ export type User = {
 export type UsersConnection = {
   __typename?: 'UsersConnection';
   nodes: Array<AdminUser>;
+  pageInfo: PageInfo;
   totalCount: Scalars['Int64']['output'];
 };
 

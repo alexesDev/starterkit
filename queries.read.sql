@@ -31,7 +31,9 @@ select u.id,
   from users u
   left join admins a on a.user_id = u.id
   left join user_bans b on b.user_id = u.id
- order by u.id;
+ where u.id < sqlc.arg(before)
+ order by u.id desc
+ limit sqlc.arg(page_limit);
 
 -- name: DBGetAdminUserByID :one
 select u.id,
@@ -53,14 +55,16 @@ select count(*) from users;
 select a.user_id, a.created_at, u.email, u.name
   from admins a
   join users u on u.id = a.user_id
- order by a.created_at desc;
+ where a.user_id < sqlc.arg(before)
+ order by a.user_id desc
+ limit sqlc.arg(page_limit);
 
 -- name: DBCountAdmins :one
 select count(*) from admins;
 
 -- name: DBListAuditLog :many
 select * from audit_log
- where (id < sqlc.arg(before) or sqlc.arg(before) = 0)
+ where id < sqlc.arg(before)
  order by id desc
  limit sqlc.arg(page_limit);
 

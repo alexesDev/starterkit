@@ -26,8 +26,8 @@ module.exports = {
 				// Relay-style fragment masking: a spread field is an opaque ref
 				inlineFragmentTypes: 'mask',
 				// wire shapes of the custom scalars: Int64 is a JSON number,
-				// Time an RFC3339 string
-				scalars: { Int64: 'number', Time: 'string' },
+				// Cursor an opaque string the client hands back unread
+				scalars: { Int64: 'number', Cursor: 'string' },
 				// every mutation refetches every query - the reset marker convention
 				revalidation: 'all',
 				molRuntime: '$starterkit_gql',

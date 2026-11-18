@@ -81,8 +81,9 @@ the trusted proxy list, and puts it in the context. It then calls
   admin, and any ban reason, in a single row (`queries.read.sql`, used at
   `auth.go:140`). It goes through the read pool.
 - A first sign-in runs the `signinbyoidc` case in its own write transaction
-  (`auth.go:97`, `auth.go:229`), which upserts the user and promotes the
-  bootstrap admin when the `admins` table is empty
+  (`auth.go:97`, `auth.go:229`), which upserts the user and promotes it to
+  admin when its email matches the configured bootstrap admin and the `admins`
+  table is empty
   (`internal/case/signinbyoidc/resolve.go`).
 - A later sign-in is noticed by the token's `iat` advancing, and recorded
   directly on the base write handle (`auth.go:170`).
@@ -184,9 +185,13 @@ transaction, because it only reads and then delivers
 (`internal/case/notifyuserbanned/resolve.go`). A job that writes opens its own:
 `purge-audit-log` wraps its case in `a.WithTransaction` (`jobs.go:56`).
 
-**5. Retry.** A handler that returns an error leaves its message in the queue;
-goqite hands it out again after the visibility timeout, up to `MaxReceive`
-times. A handler that succeeds deletes it. Delivery is at least once, so **a
+**5. Retry.** A handler that returns an error leaves its message in the queue,
+and goqite hands it out again once the message's timeout expires, up to
+`MaxReceive` deliveries in all. While a handler runs, goqite's runner extends
+that timeout by 5 seconds every 4 seconds (its default `Extend`), so the
+configured 5 minutes is the retry delay only for a handler that fails within its
+first few seconds; one that ran longer is retried within about 5 seconds of
+failing. A handler that succeeds deletes its message. Delivery is at least once, so **a
 handler must be safe to run twice**.
 
 **Cron** sits in front of this, not beside it. `internal/cronjobs` wraps
@@ -325,8 +330,10 @@ honest: a text value cannot land in an integer column.
 
 **Cost:** STRICT allows only `int`, `integer`, `real`, `text`, `blob` and
 `any`. Booleans are `integer` 0/1, which is why `isAdmin` needs a resolver
-(`schema.resolvers.go`, `IsAdmin`). The goqite table is vendored as is and is
-not STRICT.
+(`schema.resolvers.go`, `IsAdmin`). The goqite table is STRICT too, but its
+timestamps are `text` columns named `created`, `updated` and `timeout`, outside
+the `_at` convention, so no override claims them
+(`db/migrations/20260810090400_create_goqite.sql`).
 
 ### goqite instead of a broker
 

@@ -5,6 +5,7 @@ Why things are the way they are. Start here, in this order.
 | | |
 |---|---|
 | [architecture.md](architecture.md) | The shape of the system, and a table of where each kind of change goes. **Read this first.** |
+| [architecture-explained.md](architecture-explained.md) | The request and job paths end to end, the reason and the cost of each choice, and how to add each kind of thing |
 | [rules.md](rules.md) | The house rules. Not style preferences — each one cost somebody a day. |
 | [env-pattern.md](env-pattern.md) | The architecture the whole kit rests on, how a service object plugs into it, and the mistakes it is prone to |
 | [data-layer.md](data-layer.md) | SQLite, sqlc, dbmate, the read/write split, timestamps, pagination |

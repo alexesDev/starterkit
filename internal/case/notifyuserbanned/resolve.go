@@ -13,11 +13,12 @@ import (
 type Env interface {
 	DBGetUserByID(ctx context.Context, id int64) (db.User, error)
 	DBGetUserBan(ctx context.Context, userID int64) (db.UserBan, error)
-	NotifyUserBanned(ctx context.Context, to notifier.Address, reason string) error
+	NotifyUserBanned(ctx context.Context, key notifier.IdempotencyKey, to notifier.Address, reason string) error
 }
 
 type Input struct {
-	UserID int64 `json:"userId"`
+	UserID int64                   `json:"userId"`
+	Key    notifier.IdempotencyKey `json:"key"`
 }
 
 func Resolve(ctx context.Context, env Env, input Input) error {
@@ -39,7 +40,7 @@ func Resolve(ctx context.Context, env Env, input Input) error {
 		return fmt.Errorf("failed to load the ban of user %d: %w", input.UserID, err)
 	}
 
-	err = env.NotifyUserBanned(ctx, notifier.Address(user.Email), ban.Reason)
+	err = env.NotifyUserBanned(ctx, input.Key, notifier.Address(user.Email), ban.Reason)
 	if err != nil {
 		return fmt.Errorf("failed to notify user %d: %w", input.UserID, err)
 	}

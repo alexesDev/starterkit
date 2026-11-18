@@ -227,7 +227,9 @@ anything real), and the bootstrap rule promotes that account to admin because
 
 ## Where to read next
 
-[docs/architecture.md](docs/architecture.md) is the map, and
+[docs/architecture.md](docs/architecture.md) is the map,
+[docs/architecture-explained.md](docs/architecture-explained.md) walks a request
+and a job through every layer and says what each choice costs, and
 [docs/README.md](docs/README.md) is the index. The one idea worth internalising
 before touching anything is in [docs/env-pattern.md](docs/env-pattern.md), which
 is this kit's operational version of

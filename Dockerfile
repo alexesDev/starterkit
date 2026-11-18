@@ -39,7 +39,7 @@ COPY --from=ui /mam/starterkit/app/- ./assets/ui/app/-
 ARG GIT_COMMIT=unknown
 RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.GitCommit=${GIT_COMMIT}" -o /out/starterkit ./cmd/server
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static:nonroot
 
 COPY --from=build /out/starterkit /starterkit
 

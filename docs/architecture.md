@@ -1,5 +1,10 @@
 # Architecture
 
+This is the map. [architecture-explained.md](architecture-explained.md) is the
+walk: the request and job paths step by step, why each choice was made and what
+it costs, and how to add a use case, a query, a job, a cron entry, a metric or a
+configuration value.
+
 ## The shape
 
 ```

@@ -25,6 +25,7 @@ table of where each kind of change goes. Then, as needed:
 | [docs/behavioural-testing.md](docs/behavioural-testing.md) | Before changing e2e or the snapshot baseline |
 | [docs/auth-dex.md](docs/auth-dex.md) | Before touching identity, admin checks, or the audit log |
 | [docs/traefik-forward-auth.md](docs/traefik-forward-auth.md) | Before touching the container stack |
+| [docs/container-images.md](docs/container-images.md) | Before writing a Dockerfile, or adding a binary that ships as its own image |
 
 ## Commands
 

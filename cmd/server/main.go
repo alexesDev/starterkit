@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -36,6 +37,10 @@ func main() {
 func run() error {
 	config, err := appconfig.Get()
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+
 		return err
 	}
 

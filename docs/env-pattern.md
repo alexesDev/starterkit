@@ -92,7 +92,7 @@ type Env interface {
 
 func New(env Env, from Address, origin Origin) *Notifier
 
-func (n *Notifier) NotifyUserBanned(ctx context.Context, to Address, reason string) error
+func (n *Notifier) NotifyUserBanned(ctx context.Context, key IdempotencyKey, to Address, reason string) error
 ```
 
 `appState` embeds it:
@@ -120,7 +120,7 @@ and nothing more:
 type Env interface {
 	DBGetUserByID(ctx context.Context, id int64) (db.User, error)
 	DBGetUserBan(ctx context.Context, userID int64) (db.UserBan, error)
-	NotifyUserBanned(ctx context.Context, to notifier.Address, reason string) error
+	NotifyUserBanned(ctx context.Context, key notifier.IdempotencyKey, to notifier.Address, reason string) error
 }
 ```
 

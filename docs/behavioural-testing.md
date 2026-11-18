@@ -97,6 +97,83 @@ targeted tests, it does not replace them:
 Use the snapshot for breadth and the targeted tests for the properties you
 actually care about.
 
+## A test against a real dependency skips when the dependency is absent
+
+Some properties are only worth asserting against the real thing — a database
+server's locking, a binary's output format, a protocol a stub would only
+imitate. Such a test looks for its dependency first, and when it is missing the
+test *skips* with a message that names what is missing and how to get it. It
+does not fail, because a contributor without the dependency would learn to
+ignore a red suite; and it does not pass, because a green test that checked
+nothing is a lie in the report.
+
+The kit has no such test today — everything it runs is in-process. The first
+project that adds one keeps the lookup in one helper beside its tests:
+
+```go
+func absent(t *testing.T, reason string) {
+	t.Helper()
+
+	if os.Getenv("REQUIRE_INTEGRATION") != "" {
+		t.Fatal(reason)
+	}
+
+	t.Skip(reason)
+}
+
+func requireBinary(t *testing.T, name, install string) string {
+	t.Helper()
+
+	path, err := exec.LookPath(name)
+	if err != nil {
+		absent(t, name + " is not on PATH, so this test cannot run; " + install)
+	}
+
+	return path
+}
+
+func requireService(t *testing.T, envVar, start string) string {
+	t.Helper()
+
+	addr := os.Getenv(envVar)
+	if addr == "" {
+		absent(t, envVar + " is not set, so this test has nothing to run against; " + start)
+	}
+
+	conn, err := net.DialTimeout("tcp", addr, time.Second)
+	if err != nil {
+		absent(t, envVar + "=" + addr + " does not answer (" + err.Error() + "); " + start)
+	}
+
+	_ = conn.Close()
+
+	return addr
+}
+```
+
+```go
+func TestTheDumpReadsBackTheSchema(t *testing.T) {
+	sqlite3 := requireBinary(t, "sqlite3", "install the sqlite3 package of your distribution")
+
+	out, err := exec.Command(sqlite3, ":memory:", "create table t (id integer) strict;", ".schema").Output()
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "strict")
+}
+```
+
+The message is the whole interface: `go test -v` prints it on the `SKIP` line,
+so the reader learns what to install without opening the test. Two rules keep
+the skip honest:
+
+- **Skip on absence, never on failure.** The lookup decides whether the test
+  can run. Once it runs, an error from the dependency is a failure like any
+  other — a test that skips whenever its dependency misbehaves has stopped
+  testing the dependency.
+- **The machine that is supposed to have the dependency fails instead of
+  skipping.** A CI job that installs it sets `REQUIRE_INTEGRATION=1`, and
+  `absent` turns the skip into `t.Fatal`. Otherwise a broken install turns the
+  whole integration suite into a column of quiet skips, and the job stays green.
+
 ## The order of the run is a dependency chain
 
 `playwright.config.ts` spells it out as one project per spec, each depending on

@@ -4,11 +4,14 @@
 // takes it at construction, and is embedded into `app`, so its methods are
 // promoted and a case reaches them through its own Env like any other. The
 // delivery here writes to the log; replacing that body with an SMTP dial is
-// the whole change, and no case moves. See docs/env-pattern.md.
+// the whole change, and no case moves. Every notice carries the idempotency
+// key its enqueue minted, so a real delivery hands it to the other side. See
+// docs/env-pattern.md and docs/jobs-and-cron.md.
 package notifier
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 
 	"starterkit/internal/logger"
@@ -19,6 +22,8 @@ type Address string
 type Origin string
 
 type Kind string
+
+type IdempotencyKey string
 
 const KindUserBanned Kind = "user_banned"
 
@@ -37,18 +42,27 @@ func New(env Env, from Address, origin Origin) *Notifier {
 	return &Notifier{env: env, from: from, origin: origin}
 }
 
-func (n *Notifier) NotifyUserBanned(ctx context.Context, to Address, reason string) error {
-	return n.deliver(ctx, KindUserBanned, to,
+func NewIdempotencyKey() IdempotencyKey {
+	return IdempotencyKey(rand.Text())
+}
+
+func (n *Notifier) NotifyUserBanned(ctx context.Context, key IdempotencyKey, to Address, reason string) error {
+	return n.deliver(ctx, KindUserBanned, key, to,
 		"your access to "+string(n.origin)+" was revoked: "+reason)
 }
 
-func (n *Notifier) deliver(ctx context.Context, kind Kind, to Address, body string) error {
+func (n *Notifier) deliver(ctx context.Context, kind Kind, key IdempotencyKey, to Address, body string) error {
 	if to == "" {
 		return errors.New("cannot deliver " + string(kind) + " to an empty address")
 	}
 
+	if key == "" {
+		return errors.New("cannot deliver " + string(kind) + " without an idempotency key")
+	}
+
 	n.env.Logger().Info("notice delivered",
 		"kind", string(kind),
+		"key", string(key),
 		"from", string(n.from),
 		"to", string(to),
 		"body", body)

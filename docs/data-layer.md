@@ -98,6 +98,68 @@ own schema, vendored verbatim, and its columns are named `created`, `updated`
 and `timeout` — outside our `_at`/`_date` convention, so no override matches
 them and nothing in Go reads them.
 
+## Ordering needs its own integer, not a timestamp
+
+Time columns hold whole seconds, so two rows written in the same second tie,
+and `order by created_at` returns them in whatever order the planner finds
+them. A page boundary that falls inside a tie shows a row twice or never. When
+the order of rows matters — a feed, a log, a cursor — order by an integer the
+database hands out, never by a time.
+
+Where the table's key is already `integer primary key autoincrement`, that key
+is the sequence: `audit_log` orders by `id`, and `created_at` is only shown.
+Where the key is something else — text, an external identifier, a composite —
+give the table a `seq` and make the key a unique index instead:
+
+```sql
+create table events (
+  seq integer primary key autoincrement,
+  event_id text not null,
+  payload text not null,
+  created_at integer not null
+) strict;
+
+create unique index events_event_id on events (event_id);
+```
+
+SQLite only hands out `autoincrement` values to the `integer primary key`
+column, so `seq` has to be that column; a second integer column cannot
+autoincrement. `autoincrement` rather than a bare `integer primary key` because
+without it SQLite may reuse the largest value after its row is deleted, and a
+cursor that saw that value would skip the row written under it.
+
+## Singleton state is a table of one row
+
+State there is exactly one of — a setting, the last run of something, a
+watermark — lives in a table whose key can only be `1`:
+
+```sql
+create table sync_state (
+  id integer primary key check (id = 1),
+  cursor text not null,
+  updated_at integer not null
+) strict;
+```
+
+```sql
+-- name: DBSaveSyncState :exec
+insert into sync_state (id, cursor, updated_at)
+values (1, sqlc.arg(cursor), sqlc.arg(updated_at))
+on conflict (id) do update set
+  cursor = excluded.cursor,
+  updated_at = excluded.updated_at;
+
+-- name: DBGetSyncState :one
+select * from sync_state where id = 1;
+```
+
+The `check` is what makes it a singleton: a second row is a constraint error,
+not a quiet duplicate a later `limit 1` picks between. A key-value table would
+hold the same facts as strings, without types, without `not null`, and without
+the database refusing a value it does not recognise. Before the first save the
+read is `sql.ErrNoRows`, which the caller answers with its default — the same
+`db.IsNotFound` branch every other read has.
+
 ## Migrations
 
 ```bash

@@ -4,8 +4,10 @@
 layer is, which way the dependencies point, what happens to a request and to a
 job from the first byte to the last write, why each choice was made and what it
 costs, and how to add the things a project adds in its first month. Every claim
-here names the file and line it was checked against; when the code changes,
-the line it names is the one to re-read.
+here names the file and the symbol it was checked against, such as
+(`cmd/server/main.go`, `run`). References name a symbol, not a line: an edit
+elsewhere in the file leaves them pointing at the right code, and when a named
+symbol changes, the claims that name it are the ones to re-read.
 
 If you read one other page, read [env-pattern.md](env-pattern.md). If you read
 two, add [rules.md](rules.md).
@@ -33,18 +35,18 @@ keeping:
 
 - **Nothing imports `cmd/server`.** It is `package main`, so nothing can. Every
   other package declares what it needs as an interface and `app` satisfies it.
-  `internal/graph` declares `graph.Env` (`internal/graph/resolver.go:30`),
-  `internal/metrics` declares `metrics.Env` (`internal/metrics/metrics.go:36`),
+  `internal/graph` declares `graph.Env` (`internal/graph/resolver.go`, `Env`),
+  `internal/metrics` declares `metrics.Env` (`internal/metrics/metrics.go`, `Env`),
   `internal/notifier` declares `notifier.Env`
-  (`internal/notifier/notifier.go:25`), `internal/jobs` declares `jobs.Env`
-  (`internal/jobs/jobs.go:15`). That is consumer-defined interfaces all the way
+  (`internal/notifier/notifier.go`, `Env`), `internal/jobs` declares `jobs.Env`
+  (`internal/jobs/jobs.go`, `Env`). That is consumer-defined interfaces all the way
   down, and it is why there are no import cycles to break.
 - **A case imports no other case.** A case that needs another's effect declares
   a port on its own `Env`. `banuser` wants a notice sent and declares
-  `EnqueueUserBannedNotice` (`internal/case/banuser/resolve.go:22`); it never
+  `EnqueueUserBannedNotice` (`internal/case/banuser/resolve.go`, `Env`); it never
   imports `notifyuserbanned`.
 - **A case does not import `internal/graph`.** It imports `internal/graph/model`
-  for the generated `Input` and `Payload` types (`banuser/resolve.go:13`), which
+  for the generated `Input` and `Payload` types (the imports of `internal/case/banuser/resolve.go`), which
   is data, not behaviour. `graph` imports the cases, not the other way round.
 
 `internal/graph/model` (generated GraphQL types) and `internal/model` (types the
@@ -63,44 +65,44 @@ oauth2-proxy sets `Authorization: Bearer <id token>`
 [traefik-forward-auth.md](traefik-forward-auth.md).
 
 **2. The HTTP server.** `run` builds an `http.Server` with read, write and idle
-timeouts and a header cap (`cmd/server/main.go:86`). The handler is
-`securityHeaders(a.withRequest(mux))` (`cmd/server/http.go:44`), so every
-response carries the CSP and framing headers (`http.go:80`) and every request
+timeouts and a header cap (`cmd/server/main.go`, `run`). The handler is
+`securityHeaders(a.withRequest(mux))` (`cmd/server/http.go`, `app.routes`), so every
+response carries the CSP and framing headers (`cmd/server/http.go`, `securityHeaders`) and every request
 goes through `withRequest` before routing.
 
-**3. Identity, once per request.** `withRequest` (`http.go:100`) creates an
+**3. Identity, once per request.** `withRequest` (`cmd/server/http.go`, `app.withRequest`) creates an
 `appreq.Request` carrying the client IP, resolved by `clientip.Resolve` against
 the trusted proxy list, and puts it in the context. It then calls
-`resolveIdentity` (`cmd/server/auth.go:115`):
+`resolveIdentity` (`cmd/server/auth.go`, `app.resolveIdentity`):
 
 - `gateauth.Client.Identity` verifies the ID token against the issuer's JWKS,
   checks the audience, and requires a verified email
-  (`internal/gateauth/gateauth.go:55`). No token is not an error; `/healthz`
+  (`internal/gateauth/gateauth.go`, `Client.Identity`). No token is not an error; `/healthz`
   and `/readyz` are served without one.
 - One indexed read, `DBGetIdentityByOIDC`, returns the user, whether they are an
   admin, and any ban reason, in a single row (`queries.read.sql`, used at
-  `auth.go:140`). It goes through the read pool.
+  `cmd/server/auth.go`, `app.resolveIdentity`). It goes through the read pool.
 - A first sign-in runs the `signinbyoidc` case in its own write transaction
-  (`auth.go:97`, `auth.go:229`), which upserts the user and promotes it to
+  (`cmd/server/auth.go`, `app.SignInByOIDC` and `app.firstSignIn`), which upserts the user and promotes it to
   admin when its email matches the configured bootstrap admin and the `admins`
   table is empty
   (`internal/case/signinbyoidc/resolve.go`).
 - A later sign-in is noticed by the token's `iat` advancing, and recorded
-  directly on the base write handle (`auth.go:170`).
+  directly on the base write handle (`cmd/server/auth.go`, `app.recordSignIn`).
 
 A banned identity gets a 403 and a stale token a redirect or a 401
-(`http.go:115`, `http.go:120`, `http.go:135`) before any route runs. Admin
+(`cmd/server/http.go`, `app.withRequest` and `app.refuseStaleToken`) before any route runs. Admin
 rights and bans are read from the database on every request, so revoking
 either applies to the next request rather than at the token's expiry.
 
 **4. Routing.** `POST <base>/graphql` is `limitBody(requireIdentity(graph handler))`
-(`http.go:35`). `limitBody` caps the body at 1 MiB (`http.go:91`);
-`requireIdentity` refuses a request with no verified user (`http.go:161`). The
+(`cmd/server/http.go`, `app.routes`). `limitBody` caps the body at 1 MiB (`cmd/server/http.go`, `limitBody`);
+`requireIdentity` refuses a request with no verified user (`cmd/server/http.go`, `app.requireIdentity`). The
 GraphQL handler (`internal/graph/handler.go`) takes POST (and answers OPTIONS),
 caches parsed queries, and refuses an operation above a fixed complexity of 60.
 
 **5. The admin boundary.** Every real mutation lives under `Mutation.admin`.
-Its resolver calls `checkAdmin` (`internal/graph/resolver.go:72`), which reads
+Its resolver calls `checkAdmin` (`internal/graph/resolver.go`, `Resolver.checkAdmin`), which reads
 the identity `withRequest` already loaded, writes a `denied:` audit entry and
 increments a counter on refusal, and for a mutation that is allowed records the
 selected fields and the variables as an audit entry. Because this runs when the
@@ -108,7 +110,7 @@ namespace object resolves, every field beneath it is gated without each field
 remembering to check.
 
 **6. The resolver.** `AdminMutation.banUser` is one line
-(`internal/graph/schema.resolvers.go:21`):
+(`internal/graph/schema.resolvers.go`, `adminMutationResolver.BanUser`):
 
 ```go
 return r.env(ctx).BanUser(ctx, input)
@@ -117,7 +119,7 @@ return r.env(ctx).BanUser(ctx, input)
 `r.env(ctx)` returns `graph.Env`, which `app` satisfies. The resolver knows
 nothing about transactions, SQL or validation.
 
-**7. The command.** `app.BanUser` (`cmd/server/commands.go:27`) is where the
+**7. The command.** `app.BanUser` (`cmd/server/commands.go`, `app.BanUser`) is where the
 transaction boundary is chosen:
 
 ```go
@@ -126,26 +128,26 @@ return runInTx(ctx, a, func(txCtx context.Context, env *app) (banuser.Payload, e
 })
 ```
 
-`runInTx` (`commands.go:13`) wraps `WithTransaction` (`cmd/server/tx.go:52`),
+`runInTx` (`cmd/server/commands.go`, `runInTx`) wraps `WithTransaction` (`cmd/server/tx.go`, `app.WithTransaction`),
 which refuses to nest, begins a transaction on the single-connection write pool,
 and makes a shallow copy of `app` whose `Queries` and `WriteQueries` are bound
-to that transaction (`tx.go:38`). The copy is also stored in the context, so
+to that transaction (`cmd/server/tx.go`, `app.withTxQueries`). The copy is also stored in the context, so
 code that only has a `ctx` can still find the open transaction.
 
-**8. The case.** `banuser.Resolve` (`internal/case/banuser/resolve.go:39`)
+**8. The case.** `banuser.Resolve` (`internal/case/banuser/resolve.go`, `Resolve`)
 receives the transactional copy as its narrow `Env`. It trims and validates the
 input and returns an `ErrorPayload` with a nil error for anything the domain
 rejects; reads the user through the transaction; inserts the ban; enqueues the
 notice; and increments a counter. It never mentions a transaction.
 
 **9. The enqueue.** `EnqueueUserBannedNotice` is one line on `app`
-(`cmd/server/jobs.go:49`) that calls `EnqueueJob` (`jobs.go:27`).
+(`cmd/server/jobs.go`, `app.EnqueueUserBannedNotice`) that calls `EnqueueJob` (`cmd/server/jobs.go`, `app.EnqueueJob`).
 `EnqueueJob` finds the open transaction through the context and calls
 `goqitejobs.CreateTx` on it, so the queue row is written in the same
 transaction as the ban.
 
 **10. Commit or roll back.** `WithTransaction` commits when the callback returns
-a nil error and rolls back otherwise (`tx.go:72`, `tx.go:77`). A domain
+a nil error and rolls back otherwise (`cmd/server/tx.go`, `app.WithTransaction`). A domain
 failure is a nil error, so a case that wrote nothing before deciding it
 failed commits nothing.
 
@@ -155,27 +157,26 @@ random reference and returns only `internal error, ref <hex>` to the caller.
 Parser and validator errors and `ErrNotAdmin` pass through unchanged.
 
 **12. Audit, after the transaction.** While a request is in scope,
-`WriteAudit` only appends to the request (`auth.go:59`). After the handler
+`WriteAudit` only appends to the request (`cmd/server/auth.go`, `app.WriteAudit`). After the handler
 returns, `withRequest` flushes the buffer through the base write handle, outside
-any transaction and detached from the request's cancellation (`http.go:127`,
-`auth.go:72`). So the record of a denied or rolled-back operation survives, and
+any transaction and detached from the request's cancellation (`cmd/server/http.go`, `app.withRequest`; `cmd/server/auth.go`, `app.flushAudit`). So the record of a denied or rolled-back operation survives, and
 a client that disconnects cannot take its audit row with it.
 
 ## The job path
 
 **1. Enqueue in the transaction.** Step 9 above: the job row and the row it is
 about commit or roll back together. Outside a transaction `EnqueueJob` writes
-the queue row on its own (`jobs.go:39`).
+the queue row on its own (`cmd/server/jobs.go`, `app.EnqueueJob`).
 
 **2. The queue.** The queue is [goqite](https://github.com/maragudk/goqite), a
 table in the same SQLite file (`db/migrations/20260810090400_create_goqite.sql`),
-read through its own single-connection pool (`internal/db/setup.go:47`).
+read through its own single-connection pool (`internal/db/setup.go`, `Setup`).
 `newApp` configures it with `MaxReceive: 3` and a 5-minute visibility timeout,
 and a runner that polls every 2 seconds and runs at most 2 jobs at once
-(`cmd/server/main.go:175`).
+(`cmd/server/main.go`, `newApp`).
 
-**3. The handler.** `registerJobs` (`jobs.go:55`) registers each job through
-`jobs.Register` (`internal/jobs/jobs.go:23`), which unmarshals the JSON payload
+**3. The handler.** `registerJobs` (`cmd/server/jobs.go`, `app.registerJobs`) registers each job through
+`jobs.Register` (`internal/jobs/jobs.go`, `Register`), which unmarshals the JSON payload
 into the handler's own typed parameter, runs it, and increments
 `jobs_finished_total{job,outcome}`. The handler closes over `a`, so the
 compiler checks that `app` satisfies the case's `Env` at the registration site.
@@ -183,7 +184,7 @@ compiler checks that `app` satisfies the case's `Env` at the registration site.
 **4. The case.** `notifyuserbanned.Resolve` runs against the base `app`, with no
 transaction, because it only reads and then delivers
 (`internal/case/notifyuserbanned/resolve.go`). A job that writes opens its own:
-`purge-audit-log` wraps its case in `a.WithTransaction` (`jobs.go:56`).
+`purge-audit-log` wraps its case in `a.WithTransaction` (`cmd/server/jobs.go`, `app.registerJobs`).
 
 **5. Retry.** A handler that returns an error leaves its message in the queue,
 and goqite hands it out again once the message's timeout expires, up to
@@ -196,15 +197,15 @@ handler must be safe to run twice**.
 
 **Cron** sits in front of this, not beside it. `internal/cronjobs` wraps
 `robfig/cron/v3` with overlap suppression and panic recovery
-(`internal/cronjobs/cronjobs.go:47`). A cron entry's whole body is an enqueue
-(`cmd/server/cron.go:12`), so the scheduler never does the work, a slow job
+(`internal/cronjobs/cronjobs.go`, `Runner.run`). A cron entry's whole body is an enqueue
+(`cmd/server/cron.go`, `app.registerCronJobs`), so the scheduler never does the work, a slow job
 never delays another tick, and scheduled work inherits the queue's retries.
 
 ## Why each choice was made, and what it costs
 
 ### Narrow `Env` per case
 
-Each case declares only the methods it calls (`banuser/resolve.go:18`). A
+Each case declares only the methods it calls (`internal/case/banuser/resolve.go`, `Env`). A
 reader knows what a case can reach without leaving the file, `moq` generates a
 mock of exactly that much, and a test sets three functions rather than an
 application.
@@ -218,13 +219,13 @@ it: nothing stops an `Env` from listing twenty methods.
 ### `app` as the one IO spine
 
 One struct holds every connection, client and piece of process state
-(`cmd/server/app.go:28`) and satisfies every `Env` at once. Passing `a` to
-`graph.NewHandler` (`http.go:35`) and to `jobs.Register` (`jobs.go:56`) is the
+(`cmd/server/app.go`, `app`) and satisfies every `Env` at once. Passing `a` to
+`graph.NewHandler` (`cmd/server/http.go`, `app.routes`) and to `jobs.Register` (`cmd/server/jobs.go`, `app.registerJobs`) is the
 entire dependency injection, and it runs at compile time.
 
 `app` is split in two on purpose. `app` itself holds only what changes per
 transaction — the query handles and `currentTx` — and everything that lives as
-long as the process sits behind the `*appState` pointer (`app.go:37`), so the
+long as the process sits behind the `*appState` pointer (`cmd/server/app.go`, `appState`), so the
 shallow copy in `withTxQueries` shares it. A mutex, cache or atomic placed
 directly on `app` would be silently duplicated into every transaction.
 
@@ -246,7 +247,7 @@ mutations under one `admin` selection are two transactions, not one: gqlgen
 resolves the fields beneath the namespace object concurrently, and each command
 opens its own transaction on the single writer. A command must call a case's
 `Resolve`, never another command, or it gets `ErrNestedTransaction`
-(`tx.go:53`). And the commit decision is the error, not the payload: a case
+(`cmd/server/tx.go`, `ErrNestedTransaction`). And the commit decision is the error, not the payload: a case
 that writes and *then* returns an `ErrorPayload` commits what it wrote.
 
 ### The read/write query split and the naming rule
@@ -256,7 +257,7 @@ sqlc generates both onto `*Queries`, and `make sqlc` then runs
 `internal/db/fix_write_queries.sh`, which rebinds the write methods onto
 `*WriteQueries` (`Makefile`, target `sqlc`). A function holding `*db.Queries`
 cannot call an insert; the compiler says so. The read pool also opens with
-`query_only(1)` (`internal/db/setup.go:96`), so a write that somehow reached it
+`query_only(1)` (`internal/db/setup.go`, `open`), so a write that somehow reached it
 would still fail at the database.
 
 The `DB` prefix keeps generated names apart from command methods on `app`, and
@@ -286,14 +287,14 @@ tolerates absent parameters, or as separate queries.
 
 ### SQLite in WAL with separate pools
 
-One file, three pools (`internal/db/setup.go:30`): reads with up to 25
+One file, three pools (`internal/db/setup.go`, `Setup`): reads with up to 25
 connections and `query_only`, application writes with exactly one, and the
-queue with its own one. Every pragma is in the DSN (`setup.go:88`) so it
+queue with its own one. Every pragma is in the DSN (`internal/db/setup.go`, `open`) so it
 applies to every connection the driver opens, including `busy_timeout`,
-`foreign_keys` and WAL. Writers use `_txlock=immediate` (`setup.go:101`), so a
+`foreign_keys` and WAL. Writers use `_txlock=immediate` (`internal/db/setup.go`, `open`), so a
 transaction takes the write lock at `BEGIN` and waits for it instead of failing
 on upgrade. The server migrates itself on boot from embedded migrations
-(`setup.go:58`) through a cgo-free dbmate driver (`internal/dbmate/sqlite`), so
+(`internal/db/setup.go`, `Migrate`) through a cgo-free dbmate driver (`internal/dbmate/sqlite`), so
 the binary is static.
 
 **Cost:** one writer at a time, for the whole process. A write transaction that
@@ -311,7 +312,7 @@ wildcard override maps every one of them to `dbtime.Stamp` (`sqlc.yaml`), which
 embeds `time.Time` and implements `Scan` and `Value`
 (`internal/dbtime/stamp.go`). GraphQL has one `Timestamp` object type bound to
 `Stamp`, whose `unix` and `formatted(layout)` fields need no resolver. The
-application writes every timestamp itself from `app.Now()` (`app.go:72`), so a
+application writes every timestamp itself from `app.Now()` (`cmd/server/app.go`, `app.Now`), so a
 case that stores a time declares `Now()` on its `Env` and its test fixes the
 clock. The measurements and the two traps are in [rules.md](rules.md);
 `list_queries.sh` checks that every `_at`/`_date` column is `integer`, has an
@@ -330,7 +331,7 @@ honest: a text value cannot land in an integer column.
 
 **Cost:** STRICT allows only `int`, `integer`, `real`, `text`, `blob` and
 `any`. Booleans are `integer` 0/1, which is why `isAdmin` needs a resolver
-(`schema.resolvers.go`, `IsAdmin`). The goqite table is STRICT too, but its
+(`internal/graph/schema.resolvers.go`, `adminUserResolver.IsAdmin`). The goqite table is STRICT too, but its
 timestamps are `text` columns named `created`, `updated` and `timeout`, outside
 the `_at` convention, so no override claims them
 (`db/migrations/20260810090400_create_goqite.sql`).
@@ -338,7 +339,7 @@ the `_at` convention, so no override claims them
 ### goqite instead of a broker
 
 The queue is a table in the application database, so an enqueue is part of the
-transaction that caused it (`jobs.go:39`). A ban that rolls back sends nothing;
+transaction that caused it (`cmd/server/jobs.go`, `app.EnqueueJob`). A ban that rolls back sends nothing;
 a ban that commits cannot lose its notice. `cmd/server/tx_test.go` tests both.
 There is no second system to deploy, monitor or back up.
 
@@ -351,23 +352,23 @@ retired by draining its messages first, not by deleting its registration.
 ### Cron as an enqueuer
 
 See the job path above. **Cost:** a schedule is static, read from
-configuration at boot (`cron.go:15`); schedules that users edit at run time
+configuration at boot (`cmd/server/cron.go`, `app.registerCronJobs`); schedules that users edit at run time
 need their own table and a scheduler that reads it.
 
 ### Metrics and the shutdown order
 
 Counters are incremented by the code that caused the event, declared on that
-case's `Env` like any other port (`banuser/resolve.go:24`). Gauges are read
-from the database by a background loop (`internal/metrics/metrics.go:131`), so
+case's `Env` like any other port (`internal/case/banuser/resolve.go`, `Env`). Gauges are read
+from the database by a background loop (`internal/metrics/metrics.go`, `Metrics.Run`), so
 they cannot drift. `/metrics` has its own loopback listener
-(`main.go:73`), so the scraper does not need to pass the gate.
+(`cmd/server/main.go`, `run` and `metricsHandler`), so the scraper does not need to pass the gate.
 
-On SIGINT or SIGTERM the process context is cancelled (`main.go:44`), which
+On SIGINT or SIGTERM the process context is cancelled (`cmd/server/main.go`, `run`), which
 stops the job runner and the gauge loop. The shutdown goroutine
-(`main.go:98`, `main.go:133`) then marks `/readyz` as failing, sleeps
+(`cmd/server/main.go`, `run` and `app.shutdown`) then marks `/readyz` as failing, sleeps
 `ShutdownDelay` so a load balancer can deregister the instance, and gives
 in-flight requests `ShutdownTimeout` to finish. `run` waits for that goroutine
-before returning (`main.go:116`), so the deferred `conns.Close()` does not pull
+before returning (`cmd/server/main.go`, `run`), so the deferred `conns.Close()` does not pull
 the database out from under a request that is still running.
 
 **Cost:** `ShutdownDelay` is zero by default (`internal/appconfig/config.go`),
@@ -378,7 +379,7 @@ it. See [metrics-and-shutdown.md](metrics-and-shutdown.md).
 
 One endpoint, schema first (`internal/graph/schema.graphqls`), generated by
 gqlgen. Resolvers translate and delegate; the longest is about a dozen lines
-(`schema.resolvers.go`). Logic lives in cases, where a unit test reaches it. A
+(`internal/graph/schema.resolvers.go`). Logic lives in cases, where a unit test reaches it. A
 list field returns a connection with `nodes` and `totalCount` as separate
 resolvers, so a client asking for one does not pay for the other. A mutation
 takes one `input` and returns a union with `ErrorPayload`.
@@ -392,7 +393,7 @@ client might expect.
 
 A failure the domain expects — invalid input, a user who does not exist, the
 last admin — is an `ErrorPayload` returned with a nil error, carried by the
-mutation's union and rendered by the UI (`banuser/resolve.go:42`). Validation
+mutation's union and rendered by the UI (`internal/case/banuser/resolve.go`, `Resolve`). Validation
 failures carry a message per input field (`internal/graph/model/errors.go`).
 A failure the caller cannot fix — the database is gone — is an `error`, logged
 with a reference and presented as `internal error, ref …`.
@@ -407,7 +408,7 @@ Three layers, each answering a different question:
 
 | Layer | Where | What it proves |
 |---|---|---|
-| Case unit tests | `internal/case/*/resolve_test.go` | the decisions: validation, refusals, what is written, what is enqueued, which counter moves. The `Env` is a generated `moq` mock (`//go:generate` at `banuser/resolve.go:16`); assertions are `require`; a stored row is a `cupaloy` snapshot |
+| Case unit tests | `internal/case/*/resolve_test.go` | the decisions: validation, refusals, what is written, what is enqueued, which counter moves. The `Env` is a generated `moq` mock (`//go:generate` above `Env` in `internal/case/banuser/resolve.go`); assertions are `require`; a stored row is a `cupaloy` snapshot |
 | Integration tests against real SQLite | `cmd/server/tx_test.go`, package tests | the mechanisms: commit, rollback, the nested guard, an enqueue that rolls back with its transaction, a `Stamp` round trip |
 | Behavioural end-to-end | `e2e/`, Playwright against a real stand | the system: the audit log and the metrics as the oracle, and a snapshot of both against a reviewed baseline. See [behavioural-testing.md](behavioural-testing.md) |
 
@@ -423,9 +424,9 @@ turns each into a typed `.graphql.ts` function, `$starterkit_<path>()`, that
 posts the operation through `$starterkit_gql_request`
 (`assets/ui/gql/gql.ts`). A query subscribes to a marker that every mutation
 bumps, so lists revalidate after a write without screen code asking. The SPA
-learns its endpoint from `/settings.js` (`http.go:49`) rather than compiling a
+learns its endpoint from `/settings.js` (`cmd/server/http.go`, `settingsScript`) rather than compiling a
 path in. The built bundle is embedded with `go:embed` and served behind
-`requireIdentity` (`assets/embed.go`, `http.go:42`). See
+`requireIdentity` (`assets/embed.go`, `cmd/server/http.go`, `app.routes`). See
 [frontend-mol.md](frontend-mol.md).
 
 **Cost:** $mol builds inside a separate mam workspace (`Makefile`, targets `ui`
@@ -478,7 +479,7 @@ query on `graph.Env` and call it from the resolver.
 2. `cmd/server/jobs.go`: a job name constant, a `jobs.Register` call in
    `registerJobs`, wrapped in `a.WithTransaction` if the job writes.
 3. If a case enqueues it, a one-line port on `app`, like
-   `EnqueueUserBannedNotice` (`jobs.go:49`), declared on that case's `Env`.
+   `EnqueueUserBannedNotice` (`cmd/server/jobs.go`, `app.EnqueueUserBannedNotice`), declared on that case's `Env`.
 4. Make the handler safe to run twice.
 
 ### A cron entry
@@ -490,7 +491,7 @@ query on `graph.Env` and call it from the resolver.
 ### A metric
 
 1. A field on `metrics.Metrics`, built in `metrics.New` and registered
-   (`internal/metrics/metrics.go:55`).
+   (`internal/metrics/metrics.go`, `New`).
 2. A method `MetricsIncrease<Event>(ctx, …)` on `*Metrics`. `app` embeds
    `*metrics.Metrics`, so it is promoted.
 3. Declare it on the `Env` of the case that causes the event, and assert it in
@@ -516,7 +517,7 @@ in `Metrics.Update`, not a counter.
 1. `internal/<service>/`: its own `Env`, a constructor taking it, typed
    parameters.
 2. Embed it in `appState` and assign it in `newApp` after `a` exists, as
-   `notifier.New(a, …)` is (`main.go:207`).
+   `notifier.New(a, …)` is (`cmd/server/main.go`, `newApp`).
 3. Cases declare the promoted methods they call on their own `Env`.
 
 ## What not to do

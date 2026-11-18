@@ -48,6 +48,12 @@ func (c *Config) Check(r *confread.Reader) {
 
 type Env interface {
 	TableRowCounts(ctx context.Context) (map[string]int64, error)
+	DeadJobs(ctx context.Context) (DeadJobs, error)
+}
+
+type DeadJobs struct {
+	Exhausted int64
+	SetAside  int64
 }
 
 type Metrics struct {
@@ -63,6 +69,7 @@ type Metrics struct {
 	notifications *prometheus.CounterVec
 
 	tableRows *prometheus.GaugeVec
+	jobsDead  *prometheus.GaugeVec
 }
 
 func New(env Env, config Config) *Metrics {
@@ -87,11 +94,13 @@ func New(env Env, config Config) *Metrics {
 			"Notices handed to the notifier.", "kind"),
 
 		tableRows: gaugeVec(config, "table_rows", "Rows currently in each table.", "table"),
+		jobsDead: gaugeVec(config, "jobs_dead",
+			"Queued jobs that will never run again: exhausted their receives, or set aside with no handler.", "reason"),
 	}
 
 	registry.MustRegister(
 		m.signIns, m.adminDenied, m.usersBanned,
-		m.adminChanged, m.jobsFinished, m.notifications, m.tableRows,
+		m.adminChanged, m.jobsFinished, m.notifications, m.tableRows, m.jobsDead,
 	)
 
 	return m
@@ -152,6 +161,14 @@ func (m *Metrics) Update(ctx context.Context) error {
 	for table, count := range counts {
 		m.tableRows.WithLabelValues(table).Set(float64(count))
 	}
+
+	dead, err := m.env.DeadJobs(ctx)
+	if err != nil {
+		return err
+	}
+
+	m.jobsDead.WithLabelValues("exhausted").Set(float64(dead.Exhausted))
+	m.jobsDead.WithLabelValues("set_aside").Set(float64(dead.SetAside))
 
 	return nil
 }

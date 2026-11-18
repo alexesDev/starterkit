@@ -7,7 +7,9 @@
 package jobs
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 )
@@ -35,4 +37,20 @@ func Register[P any](env Env, jobID string, handler func(context.Context, P) err
 
 		return nil
 	})
+}
+
+type envelope struct {
+	Name    string
+	Message []byte
+}
+
+func Name(body []byte) (string, error) {
+	var decoded envelope
+
+	err := gob.NewDecoder(bytes.NewReader(body)).Decode(&decoded)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode a queued job: %w", err)
+	}
+
+	return decoded.Name, nil
 }

@@ -188,7 +188,9 @@ together with the work it describes — exactly when it matters most.
 
 Inside a request `WriteAudit` only buffers, and the middleware flushes once the
 transaction is released; writing immediately would deadlock against the single
-write connection the open mutation is holding. `flushAudit` also detaches from
+write connection the open mutation is holding. A job has no request, so a
+`WithTransaction` opened without one carries the same buffer and flushes it
+after its own commit or rollback. `flushAudit` also detaches from
 the request context, so a client that disconnects cannot take the record of what
 it did with it.
 

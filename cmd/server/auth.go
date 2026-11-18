@@ -55,6 +55,12 @@ func (a *app) WriteAudit(ctx context.Context, entry audit.Entry) {
 		return
 	}
 
+	txEnv := a.txEnvFromCtx(ctx)
+	if txEnv != nil {
+		txEnv.pendingAudit.Add(entry)
+		return
+	}
+
 	a.flushAudit(ctx, []audit.Entry{entry})
 }
 

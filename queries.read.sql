@@ -66,3 +66,12 @@ select * from audit_log
 
 -- name: DBCountAuditLog :one
 select count(*) from audit_log;
+
+-- name: DBListQueuedJobs :many
+select id, body from goqite where queue = ?;
+
+-- name: DBCountQueuedJobs :one
+select count(*) from goqite where queue = ?;
+
+-- name: DBCountExhaustedJobs :one
+select count(*) from goqite where queue = @queue and received >= @max_receive;

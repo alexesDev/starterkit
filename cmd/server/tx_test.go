@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"maragu.dev/goqite"
+	goqitejobs "maragu.dev/goqite/jobs"
 
 	"starterkit/internal/case/notifyuserbanned"
 	"starterkit/internal/db"
@@ -43,13 +44,27 @@ func newTestApp(t *testing.T) *app {
 
 	queue := goqite.New(goqite.NewOpts{
 		DB:         conns.Queue,
-		Name:       "jobs",
-		MaxReceive: 3,
+		Name:       jobQueue,
+		MaxReceive: jobMaxReceive,
 		Timeout:    5 * time.Minute,
 	})
 
+	runnerOpts := goqitejobs.NewRunnerOpts{
+		Limit:        2,
+		PollInterval: 10 * time.Millisecond,
+		Queue:        queue,
+	}
+
+	state := &appState{
+		conns:     conns,
+		log:       logger.Discard(),
+		queue:     queue,
+		jobNames:  map[string]struct{}{},
+		jobRunner: goqitejobs.NewRunner(runnerOpts),
+	}
+
 	a := &app{
-		appState:     &appState{conns: conns, log: logger.Discard(), queue: queue},
+		appState:     state,
 		Queries:      db.New(conns.Read),
 		WriteQueries: db.NewWriteQueries(conns.Write),
 	}

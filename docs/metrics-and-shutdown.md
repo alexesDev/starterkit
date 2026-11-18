@@ -29,10 +29,11 @@ would drift the first time the purge job deleted something. Instead
 ```go
 type Env interface {
 	TableRowCounts(ctx context.Context) (map[string]int64, error)
+	DeadJobs(ctx context.Context) (DeadJobs, error)
 }
 ```
 
-which produces one series per table:
+`TableRowCounts` produces one series per table:
 
 ```
 starterkit_table_rows{table="audit_log"} 6
@@ -61,6 +62,19 @@ list here comes from `pragma_table_list` at runtime. See
 ends when the process context is cancelled. A failed update is logged and the
 loop continues — one transient read must not silently end monitoring for the
 life of the process.
+
+`DeadJobs` counts the queued jobs that will never run again, by reason:
+
+```
+starterkit_jobs_dead{reason="exhausted"} 0
+starterkit_jobs_dead{reason="set_aside"} 0
+```
+
+`exhausted` is a job that failed `MaxReceive` times; goqite never hands it out
+again and never deletes it. `set_aside` is a job whose name no handler is
+registered for, moved off the queue at start (see
+[jobs-and-cron.md](jobs-and-cron.md)). Either one above zero is work the
+system accepted and will not do — alert on it.
 
 ## The counters
 
@@ -100,7 +114,16 @@ Stopping a server is not the same as draining one. On SIGTERM:
 ready.Store(false)        // /readyz starts returning 503 immediately
 sleep ShutdownDelay       // the load balancer notices and deregisters us
 srv.Shutdown(timeout)     // in-flight requests get their window to finish
+stop the job runner       // only now, and run waits for its jobs to return
+conns.Close()             // last, once nothing holds a connection
 ```
+
+The job runner has its own context, not the signal's. A job keeps running
+through the drain window like a request does; its context is cancelled only
+after `srv.Shutdown` returns, and `run` waits for the runner to return before
+the deferred `conns.Close()` takes the database away. A job that ignores its
+context holds shutdown until the orchestrator's kill — the at-least-once
+redelivery is what makes that kill safe.
 
 `ListenAndServe` returns the *instant* `Shutdown` is called, so `run` waits on a
 channel closed by the shutdown goroutine before returning. Without that wait the

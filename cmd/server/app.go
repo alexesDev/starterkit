@@ -10,6 +10,7 @@ import (
 	goqitejobs "maragu.dev/goqite/jobs"
 
 	"starterkit/internal/appconfig"
+	"starterkit/internal/audit"
 	"starterkit/internal/buildinfo"
 	"starterkit/internal/cronjobs"
 	"starterkit/internal/db"
@@ -25,7 +26,8 @@ type app struct {
 	*db.Queries
 	*db.WriteQueries
 
-	currentTx *sql.Tx
+	currentTx    *sql.Tx
+	pendingAudit *audit.Buffer
 }
 
 type appState struct {
@@ -45,6 +47,7 @@ type appState struct {
 	gate *gateauth.Client
 
 	queue      *goqite.Queue
+	jobNames   map[string]struct{}
 	jobRunner  *goqitejobs.Runner
 	cronRunner *cronjobs.Runner
 }

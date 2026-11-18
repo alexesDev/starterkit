@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"starterkit/internal/audit"
 	"starterkit/internal/db"
 )
 
@@ -38,6 +39,15 @@ func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app
 		return ErrNestedTransaction
 	}
 
+	pending := &audit.Buffer{}
+
+	err := a.runTransaction(ctx, pending, fn)
+	a.flushAudit(ctx, pending.Take())
+
+	return err
+}
+
+func (a *app) runTransaction(ctx context.Context, pending *audit.Buffer, fn func(context.Context, *app) error) error {
 	tx, err := a.conns.Write.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -51,6 +61,7 @@ func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app
 	}()
 
 	txEnv := a.withTxQueries(tx)
+	txEnv.pendingAudit = pending
 	txCtx := context.WithValue(ctx, txEnvKeyType{}, txEnv)
 
 	err = fn(txCtx, txEnv)

@@ -33,6 +33,33 @@ func (q *Queries) DBCountAuditLog(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const dBCountExhaustedJobs = `-- name: DBCountExhaustedJobs :one
+select count(*) from goqite where queue = ?1 and received >= ?2
+`
+
+type DBCountExhaustedJobsParams struct {
+	Queue      string `json:"queue"`
+	MaxReceive int64  `json:"max_receive"`
+}
+
+func (q *Queries) DBCountExhaustedJobs(ctx context.Context, arg DBCountExhaustedJobsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, dBCountExhaustedJobs, arg.Queue, arg.MaxReceive)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const dBCountQueuedJobs = `-- name: DBCountQueuedJobs :one
+select count(*) from goqite where queue = ?
+`
+
+func (q *Queries) DBCountQueuedJobs(ctx context.Context, queue string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, dBCountQueuedJobs, queue)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const dBCountUsers = `-- name: DBCountUsers :one
 select count(*) from users
 `
@@ -245,6 +272,38 @@ func (q *Queries) DBListAuditLog(ctx context.Context, arg DBListAuditLogParams) 
 			&i.Ip,
 			&i.CreatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const dBListQueuedJobs = `-- name: DBListQueuedJobs :many
+select id, body from goqite where queue = ?
+`
+
+type DBListQueuedJobsRow struct {
+	ID   string `json:"id"`
+	Body []byte `json:"body"`
+}
+
+func (q *Queries) DBListQueuedJobs(ctx context.Context, queue string) ([]DBListQueuedJobsRow, error) {
+	rows, err := q.db.QueryContext(ctx, dBListQueuedJobs, queue)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DBListQueuedJobsRow
+	for rows.Next() {
+		var i DBListQueuedJobsRow
+		if err := rows.Scan(&i.ID, &i.Body); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

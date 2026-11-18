@@ -8,9 +8,12 @@ import (
 	"maragu.dev/goqite"
 	goqitejobs "maragu.dev/goqite/jobs"
 
+	"starterkit/internal/case/deadletterjobs"
 	"starterkit/internal/case/notifyuserbanned"
 	"starterkit/internal/case/purgeauditlog"
+	"starterkit/internal/db"
 	"starterkit/internal/jobs"
+	"starterkit/internal/metrics"
 	"starterkit/internal/notifier"
 )
 
@@ -19,8 +22,45 @@ const (
 	jobNotifyUserBanned = "notify-user-banned"
 )
 
+const (
+	jobQueue      = "jobs"
+	jobDeadQueue  = "jobs-dead"
+	jobMaxReceive = 3
+)
+
 func (a *app) RegisterJob(id string, handler func(ctx context.Context, body []byte) error) {
 	a.jobRunner.Register(id, goqitejobs.Func(handler))
+	a.jobNames[id] = struct{}{}
+}
+
+func (a *app) JobRegistered(name string) bool {
+	_, registered := a.jobNames[name]
+
+	return registered
+}
+
+func (a *app) setAsideUnregisteredJobs(ctx context.Context) error {
+	input := deadletterjobs.Input{Queue: jobQueue, DeadQueue: jobDeadQueue}
+
+	return a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
+		return deadletterjobs.Resolve(txCtx, env, input)
+	})
+}
+
+func (a *app) DeadJobs(ctx context.Context) (metrics.DeadJobs, error) {
+	exhaustedParams := db.DBCountExhaustedJobsParams{Queue: jobQueue, MaxReceive: jobMaxReceive}
+
+	exhausted, err := a.Queries.DBCountExhaustedJobs(ctx, exhaustedParams)
+	if err != nil {
+		return metrics.DeadJobs{}, fmt.Errorf("failed to count exhausted jobs: %w", err)
+	}
+
+	setAside, err := a.Queries.DBCountQueuedJobs(ctx, jobDeadQueue)
+	if err != nil {
+		return metrics.DeadJobs{}, fmt.Errorf("failed to count set-aside jobs: %w", err)
+	}
+
+	return metrics.DeadJobs{Exhausted: exhausted, SetAside: setAside}, nil
 }
 
 func (a *app) EnqueueJob(ctx context.Context, id string, payload any, priority int) error {

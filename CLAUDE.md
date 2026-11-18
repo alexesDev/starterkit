@@ -21,6 +21,7 @@ table of where each kind of change goes. Then, as needed:
 | [docs/pagination.md](docs/pagination.md) | Before adding a list to the API, or a screen that pages through one |
 | [docs/texts.md](docs/texts.md) | Before writing a sentence a person reads, or adding a language |
 | [docs/frontend-mol.md](docs/frontend-mol.md) | Before touching `assets/ui` |
+| [docs/mol-for-agents.md](docs/mol-for-agents.md) | Before writing a `.view.tree` or a `.view.ts` — the language, reactivity, suspense, the mistakes that build green, and a first-try checklist |
 | [docs/mol-interface-design.md](docs/mol-interface-design.md) | Before designing or reviewing a screen — the first page, a list row, an item page and where its actions go |
 | [docs/jobs-and-cron.md](docs/jobs-and-cron.md) | Before adding background or scheduled work |
 | [docs/metrics-and-shutdown.md](docs/metrics-and-shutdown.md) | Before adding a metric or touching shutdown |

@@ -7,6 +7,10 @@ configure.
 This page is how the SPA is built. What a screen, a menu and an action should
 look like is in [mol-interface-design.md](mol-interface-design.md).
 
+How to write $mol at all — the tree syntax, reactivity, suspense, and the
+mistakes that still build — is in [mol-for-agents.md](mol-for-agents.md). Read
+it before the first `.view.tree`.
+
 ## Layout
 
 ```
@@ -172,7 +176,7 @@ unassignable, and the error is a wall of structural-mismatch text.
 seam).
 
 The one thing worth knowing about `molplugin.js`: it escapes every `$` in the
-stock plugins' output as `$`. The $mol builder scans sources for
+stock plugins' output as `\u0024`. The $mol builder scans sources for
 `$`-prefixed names to build its module graph, and GraphQL variables (`$limit`)
 and fragment-masking keys would otherwise read as phantom module references. TS
 treats the escape as the same character, so types and runtime strings are

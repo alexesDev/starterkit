@@ -12,6 +12,7 @@ Why things are the way they are. Start here, in this order.
 | [data-layer.md](data-layer.md) | SQLite, sqlc, dbmate, the read/write split, timestamps, pagination |
 | [graphql.md](graphql.md) | Schema conventions, the admin namespace, transactional mutations |
 | [frontend-mol.md](frontend-mol.md) | The $mol SPA, the codegen bridge, the build |
+| [mol-for-agents.md](mol-for-agents.md) | $mol itself, rule per line: naming, mam, view.tree, reactivity, suspense, routing, forms, styling, tests, and what not to do |
 | [jobs-and-cron.md](jobs-and-cron.md) | The SQLite-backed queue and the scheduler |
 | [texts.md](texts.md) | What a service says to a person: the typed catalog, plurals, the snapshot, the Cyrillic guard |
 | [auth-dex.md](auth-dex.md) | OIDC through the gate, bans, the audit log, corporate IdPs |

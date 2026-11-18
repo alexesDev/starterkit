@@ -6,12 +6,14 @@ package appconfig
 import (
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 
 	"starterkit/internal/audit"
+	"starterkit/internal/backup"
 	"starterkit/internal/clientip"
 	"starterkit/internal/confread"
 	"starterkit/internal/dbmate/sqlite"
@@ -39,6 +41,7 @@ type Config struct {
 
 	Gate     gateauth.Config
 	Audit    audit.Config
+	Backup   backup.Config
 	Notifier notifier.Config
 	Proxies  clientip.Config
 	Metrics  metrics.Config
@@ -79,6 +82,7 @@ func Parse(args, environ []string) (*Config, error) {
 	cfg.register(r)
 	cfg.Gate.Register(r)
 	cfg.Audit.Register(r)
+	cfg.Backup.Register(r)
 	cfg.Notifier.Register(r)
 	cfg.Proxies.Register(r)
 	cfg.Metrics.Register(r)
@@ -91,6 +95,7 @@ func Parse(args, environ []string) (*Config, error) {
 	cfg.check(r)
 	cfg.Gate.Check(r)
 	cfg.Audit.Check(r)
+	cfg.Backup.Check(r)
 	cfg.Notifier.Check(r)
 	cfg.Metrics.Check(r)
 	cfg.Page.Check(r)
@@ -122,6 +127,10 @@ func (c *Config) check(r *confread.Reader) {
 
 	if err == nil {
 		c.DatabaseFile = sqlite.ConnectionString(parsed)
+	}
+
+	if c.Backup.Dir == "" {
+		c.Backup.Dir = filepath.Join(filepath.Dir(c.DatabaseFile), "backups")
 	}
 }
 

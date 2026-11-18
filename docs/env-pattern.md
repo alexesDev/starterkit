@@ -278,6 +278,15 @@ there should never be one.
 Assertions are `github.com/stretchr/testify/require` — `require`, not
 `assert`. `require` stops the test at the first failure, so the report names
 the cause; `assert` carries on and buries it under its consequences.
+depguard refuses the `assert` import, so the rule holds without anyone
+remembering it.
+
+A package that starts a background loop — `cmd/server` with the job runner,
+`internal/metrics` with its gauge loop — verifies in `TestMain` with
+`go.uber.org/goleak` that no goroutine outlives its tests. A loop that ignores
+its context, or a stop that forgets to wait, fails the package by name. The one
+exception is named in `cmd/server/main_test.go`: goqite's timeout extender
+sleeps before it checks its context, so it lingers a few seconds by design.
 
 Where a test would check many fields of one value,
 `github.com/bradleyjkemp/cupaloy/v2` snapshots the value instead of a column

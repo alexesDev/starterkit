@@ -56,7 +56,7 @@ func query(t *testing.T, env *EnvMock, document string) response {
 	rec := httptest.NewRecorder()
 	scoped := appreq.New("")
 
-	graph.NewHandler(env).ServeHTTP(rec, req.WithContext(scoped.NewContext(req.Context())))
+	graph.NewHandler(env, false).ServeHTTP(rec, req.WithContext(scoped.NewContext(req.Context())))
 
 	var out response
 
@@ -127,4 +127,23 @@ func TestAuditLogLeavesAnAbsentFirstToTheConfiguredDefault(t *testing.T) {
 	calls := env.ListAuditLogCalls()
 	require.Len(t, calls, 1)
 	require.Nil(t, calls[0].Input.First, "the schema supplied a default of its own")
+}
+
+func introspect(t *testing.T, introspection graph.Introspection) string {
+	t.Helper()
+
+	srv := graph.NewHandler(&EnvMock{LoggerFunc: logger.Discard}, introspection)
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/graphql", strings.NewReader(`{"query":"{ __schema { queryType { name } } }"}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	return rec.Body.String()
+}
+
+func TestTheSchemaIsReadableOnlyWhenIntrospectionIsOn(t *testing.T) {
+	require.Contains(t, introspect(t, true), `"queryType":{"name":"Query"}`)
+	require.Contains(t, introspect(t, false), "introspection disabled")
 }

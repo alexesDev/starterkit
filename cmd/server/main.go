@@ -15,6 +15,7 @@ import (
 	goqitejobs "maragu.dev/goqite/jobs"
 
 	"starterkit/internal/appconfig"
+	"starterkit/internal/backup"
 	"starterkit/internal/buildinfo"
 	"starterkit/internal/cronjobs"
 	"starterkit/internal/db"
@@ -232,6 +233,7 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 	a.ready.Store(true)
 	a.Metrics = metrics.New(a, config.Metrics)
 	a.Notifier = notifier.New(a, config.Notifier, notifier.Origin(config.PublicURL))
+	a.Backup = backup.New(conns.Snapshot, config.Backup)
 
 	return a, nil
 }

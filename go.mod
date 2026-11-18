@@ -1,6 +1,6 @@
 module starterkit
 
-go 1.26.1
+go 1.26.11
 
 require (
 	github.com/99designs/gqlgen v0.17.94
@@ -13,6 +13,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.11.1
 	github.com/vektah/gqlparser/v2 v2.5.36
+	go.uber.org/goleak v1.3.0
 	maragu.dev/goqite v0.4.0
 	modernc.org/sqlite v1.54.0
 )
@@ -311,6 +312,7 @@ require (
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
+	golang.org/x/vuln v1.1.4 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.276.0 // indirect
 	google.golang.org/genproto v0.0.0-20260427160629-7cedc36a6bc4 // indirect
@@ -339,4 +341,5 @@ tool (
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	github.com/matryer/moq
 	github.com/sqlc-dev/sqlc/cmd/sqlc
+	golang.org/x/vuln/cmd/govulncheck
 )

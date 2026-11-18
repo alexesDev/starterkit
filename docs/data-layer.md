@@ -30,7 +30,7 @@ rule below.
 > Run `make sqlc`, never bare `sqlc generate` — the raw command leaves the write
 > methods on `*Queries` and quietly dissolves the split.
 
-## Three connection pools, one file
+## Four connection pools, one file
 
 `internal/db/setup.go` opens:
 
@@ -39,6 +39,7 @@ rule below.
 | Read | 25 | everything that only selects |
 | Write | **1** | write transactions |
 | Queue | 1 | goqite polling, kept off the app's write pool |
+| Snapshot | 1 | `VACUUM INTO` for the backup, opened `mode=ro` |
 
 The write pool is capped at one on purpose: SQLite has exactly one writer, so
 more connections would only add contention.
@@ -71,7 +72,43 @@ takes the write lock at `BEGIN`, so writers queue instead of failing.
 
 The read pool also carries `query_only(1)`. That is a second, independent wall
 under the compile-time split: even a mistake that reached this pool with a write
-could not execute it.
+could not execute it. `query_only` also refuses `VACUUM INTO`, which is why the
+backup has its own pool: the file is opened read-only (`mode=ro`), so the copy
+can write its target and nothing else.
+
+## Database errors the domain can answer
+
+`internal/db/errors.go` classifies driver errors, so a case decides on a kind of
+failure rather than on a message:
+
+- `IsNotFound` — `sql.ErrNoRows`.
+- `IsUniqueViolation` — a `UNIQUE` or `PRIMARY KEY` constraint refused the row.
+  That is usually a domain answer, not an outage: `makeadmin` inserts without
+  `on conflict` and turns the violation into `ErrorPayload{"user is already an
+  admin"}`. Letting the constraint decide closes the race a read-then-insert
+  leaves open, and the counter only moves when a row was really written.
+- `IsBusy` — `SQLITE_BUSY` or `SQLITE_LOCKED`, after `busy_timeout` ran out. It is
+  transient, so the GraphQL error presenter answers it with
+  `extensions.code = "RETRY"` and logs it at Warn instead of Error.
+
+All three see through `%w` wrapping.
+
+## Backups and free pages
+
+`internal/backup` copies the live database with `VACUUM INTO` — a consistent,
+compacted, standalone file, taken without stopping writers — as the
+`backup-database` job, enqueued by cron on `STARTERKIT_BACKUP_SPEC` (default
+03:30). Copies are named `starterkit-<UTC stamp>.sqlite3` and land in
+`STARTERKIT_BACKUP_DIR`, by default a `backups` directory beside the database;
+the newest `STARTERKIT_BACKUP_KEEP` (default 7) are kept, and `0` turns the copy
+off. A copy on the same disk survives a bad migration or a mistaken delete, not
+the disk: ship the directory off the machine, or replace the job with
+Litestream when continuous replication is worth its upkeep.
+
+The database runs with `auto_vacuum = incremental`, set by a migration that
+rebuilds the file once. Deleting rows only marks pages free; the audit purge
+then runs `pragma incremental_vacuum` (`db.ReclaimFreePages`) after its
+transaction, so the file shrinks after a purge instead of keeping its peak size.
 
 ## Timestamps
 
@@ -188,6 +225,11 @@ before `make sqlc`.
 
 The server also migrates itself on boot from the embedded `db/migrations`
 (`db/embed.go`), so a deploy needs no separate migration step.
+
+A statement that cannot run inside a transaction — `vacuum`, or a pragma such as
+`auto_vacuum` that only takes effect through one — needs
+`-- migrate:up transaction:false`, as `20261118090000_auto_vacuum_incremental.sql`
+does.
 
 ## One DATABASE_URL, two consumers
 

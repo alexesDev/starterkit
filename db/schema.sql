@@ -8,8 +8,6 @@ CREATE TABLE users (
   last_signin_at integer,
   created_at integer not null
 ) strict;
-CREATE UNIQUE INDEX users_oidc_identity on users (oidc_issuer, oidc_subject);
-CREATE INDEX users_email on users (email);
 CREATE TABLE admins (
   user_id integer primary key references users(id) on delete cascade,
   created_at integer not null
@@ -29,7 +27,6 @@ CREATE TABLE audit_log (
   ip text not null default '',
   created_at integer not null
 ) strict;
-CREATE INDEX audit_log_created_at_idx on audit_log (created_at desc);
 CREATE TABLE goqite (
   id text primary key default ('m_' || lower(hex(randomblob(16)))),
   created text not null default (strftime('%Y-%m-%dT%H:%M:%fZ')),
@@ -40,14 +37,18 @@ CREATE TABLE goqite (
   received integer not null default 0,
   priority integer not null default 0
 ) strict;
+CREATE UNIQUE INDEX users_oidc_identity on users (oidc_issuer, oidc_subject);
+CREATE INDEX users_email on users (email);
+CREATE INDEX audit_log_created_at_idx on audit_log (created_at desc);
+CREATE INDEX goqite_queue_priority_created_idx on goqite (queue, priority desc, created);
 CREATE TRIGGER goqite_updated_timestamp after update on goqite begin
   update goqite set updated = strftime('%Y-%m-%dT%H:%M:%fZ') where id = old.id;
 end;
-CREATE INDEX goqite_queue_priority_created_idx on goqite (queue, priority desc, created);
 -- Dbmate schema migrations
 INSERT INTO "schema_migrations" (version) VALUES
   ('20260810090000'),
   ('20260810090100'),
   ('20260810090200'),
   ('20260810090300'),
-  ('20260810090400');
+  ('20260810090400'),
+  ('20261118090000');

@@ -54,6 +54,10 @@ func Resolve(ctx context.Context, env Env, input Input) (Payload, error) {
 	adminParams := db.DBInsertAdminParams{UserID: input.UserID, CreatedAt: dbtime.At(env.Now())}
 
 	err = env.DBInsertAdmin(ctx, adminParams)
+	if db.IsUniqueViolation(err) {
+		return &model.ErrorPayload{Message: "user is already an admin"}, nil
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert admin: %w", err)
 	}

@@ -51,6 +51,7 @@ on it without a cycle. A check that relates two services stays in
 | `appconfig` | `addr`, `public-url`, `base-path`, `database-url`, `repo-url`, `sign-out-url`, `bootstrap-admin`, `dev-mode`, `shutdown-delay`, `shutdown-timeout` |
 | `gateauth` | `oidc-issuer`, `oidc-client-id` |
 | `audit` | `audit-retention`, `audit-purge-spec` |
+| `backup` | `backup-dir`, `backup-spec`, `backup-keep` |
 | `notifier` | `notifier-from` |
 | `clientip` | `trusted-proxies` |
 | `metrics` | `metrics-addr`, `metrics-interval` |

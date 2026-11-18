@@ -183,6 +183,7 @@ make dev        # run the server with live reload, against a running stand
 make generate   # sqlc -> gqlgen -> moq -> graphql-codegen, in that order
 make test
 make lint
+make vuln       # govulncheck over the code that is actually called
 make db-new name=x && make db-up
 make up         # docker compose: traefik, dex, oauth2-proxy
 make mol-dev    # mam dev server — in dev Traefik serves the SPA from it

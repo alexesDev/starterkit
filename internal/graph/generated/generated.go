@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"starterkit/internal/buildinfo"
 	"starterkit/internal/db"
 	"starterkit/internal/dbtime"
 	model1 "starterkit/internal/graph/model"
@@ -62,7 +63,7 @@ type AdminQueryResolver interface {
 	User(ctx context.Context, obj *model.AdminQuery, id int64) (*db.DBListUsersRow, error)
 	Admins(ctx context.Context, obj *model.AdminQuery) (*model1.AdminsConnection, error)
 	AuditLog(ctx context.Context, obj *model.AdminQuery, limit int64, before *int64) (*model1.AuditLogConnection, error)
-	BuildGitCommit(ctx context.Context, obj *model.AdminQuery) (string, error)
+	Build(ctx context.Context, obj *model.AdminQuery) (*buildinfo.Info, error)
 }
 type AdminUserResolver interface {
 	IsAdmin(ctx context.Context, obj *db.DBListUsersRow) (bool, error)
@@ -246,7 +247,13 @@ type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
   user(id: Int64!): AdminUser
   admins: AdminsConnection!
   auditLog(limit: Int64! = 50, before: Int64): AuditLogConnection!
-  buildGitCommit: String!
+  build: Build!
+}
+
+type Build @goModel(model: "starterkit/internal/buildinfo.Info") {
+  commit: String
+  builtAt: Timestamp
+  commitUrl: String
 }
 
 type AdminMutation @goModel(model: "starterkit/internal/model.AdminMutation") {
@@ -400,8 +407,8 @@ func (ec *executionContext) childFields_AdminQuery(ctx context.Context, field gr
 		return ec.fieldContext_AdminQuery_admins(ctx, field)
 	case "auditLog":
 		return ec.fieldContext_AdminQuery_auditLog(ctx, field)
-	case "buildGitCommit":
-		return ec.fieldContext_AdminQuery_buildGitCommit(ctx, field)
+	case "build":
+		return ec.fieldContext_AdminQuery_build(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type AdminQuery", field.Name)
 }
@@ -466,6 +473,18 @@ func (ec *executionContext) childFields_AuditLogEntry(ctx context.Context, field
 		return ec.fieldContext_AuditLogEntry_createdAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type AuditLogEntry", field.Name)
+}
+
+func (ec *executionContext) childFields_Build(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "commit":
+		return ec.fieldContext_Build_commit(ctx, field)
+	case "builtAt":
+		return ec.fieldContext_Build_builtAt(ctx, field)
+	case "commitUrl":
+		return ec.fieldContext_Build_commitUrl(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type Build", field.Name)
 }
 
 func (ec *executionContext) childFields_FieldMessage(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -1265,27 +1284,36 @@ func (ec *executionContext) fieldContext_AdminQuery_auditLog(ctx context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _AdminQuery_buildGitCommit(ctx context.Context, field graphql.CollectedField, obj *model.AdminQuery) (ret graphql.Marshaler) {
+func (ec *executionContext) _AdminQuery_build(ctx context.Context, field graphql.CollectedField, obj *model.AdminQuery) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
 		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return ec.fieldContext_AdminQuery_buildGitCommit(ctx, field)
+			return ec.fieldContext_AdminQuery_build(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.AdminQuery().BuildGitCommit(ctx, obj)
+			return ec.Resolvers.AdminQuery().Build(ctx, obj)
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
-			return ec.marshalNString2string(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *buildinfo.Info) graphql.Marshaler {
+			return ec.marshalNBuild2ᚖstarterkitᚋinternalᚋbuildinfoᚐInfo(ctx, selections, v)
 		},
 		true,
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_AdminQuery_buildGitCommit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AdminQuery", field, true, true, errors.New("field of type String does not have child fields"))
+func (ec *executionContext) fieldContext_AdminQuery_build(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminQuery",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Build(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _AdminUser_id(ctx context.Context, field graphql.CollectedField, obj *db.DBListUsersRow) (ret graphql.Marshaler) {
@@ -1800,6 +1828,84 @@ func (ec *executionContext) _BanUserPayload_userId(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_BanUserPayload_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("BanUserPayload", field, false, false, errors.New("field of type Int64 does not have child fields"))
+}
+
+func (ec *executionContext) _Build_commit(ctx context.Context, field graphql.CollectedField, obj *buildinfo.Info) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Build_commit(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Commit(), nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Build_commit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Build", field, true, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _Build_builtAt(ctx context.Context, field graphql.CollectedField, obj *buildinfo.Info) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Build_builtAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.BuiltAt(), nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *dbtime.Stamp) graphql.Marshaler {
+			return ec.marshalOTimestamp2ᚖstarterkitᚋinternalᚋdbtimeᚐStamp(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Build_builtAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Build",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Timestamp(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Build_commitUrl(ctx context.Context, field graphql.CollectedField, obj *buildinfo.Info) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Build_commitUrl(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CommitURL(), nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Build_commitUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Build", field, true, false, errors.New("field of type String does not have child fields"))
 }
 
 func (ec *executionContext) _ErrorPayload_message(ctx context.Context, field graphql.CollectedField, obj *model1.ErrorPayload) (ret graphql.Marshaler) {
@@ -4227,7 +4333,7 @@ func (ec *executionContext) _AdminQuery(ctx context.Context, sel ast.SelectionSe
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "buildGitCommit":
+		case "build":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -4236,7 +4342,7 @@ func (ec *executionContext) _AdminQuery(ctx context.Context, sel ast.SelectionSe
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._AdminQuery_buildGitCommit(ctx, field, obj)
+				res = ec._AdminQuery_build(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -4627,6 +4733,54 @@ func (ec *executionContext) _BanUserPayload(ctx context.Context, sel ast.Selecti
 		case "userId":
 			out.Values[i] = ec._BanUserPayload_userId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var buildImplementors = []string{"Build"}
+
+func (ec *executionContext) _Build(ctx context.Context, sel ast.SelectionSet, obj *buildinfo.Info) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, buildImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Build")
+		case "commit":
+			out.Values[i] = ec._Build_commit(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "builtAt":
+			out.Values[i] = ec._Build_builtAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "commitUrl":
+			out.Values[i] = ec._Build_commitUrl(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:
@@ -5936,6 +6090,20 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNBuild2starterkitᚋinternalᚋbuildinfoᚐInfo(ctx context.Context, sel ast.SelectionSet, v buildinfo.Info) graphql.Marshaler {
+	return ec._Build(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNBuild2ᚖstarterkitᚋinternalᚋbuildinfoᚐInfo(ctx context.Context, sel ast.SelectionSet, v *buildinfo.Info) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Build(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNFieldMessage2starterkitᚋinternalᚋgraphᚋmodelᚐFieldMessage(ctx context.Context, sel ast.SelectionSet, v model1.FieldMessage) graphql.Marshaler {

@@ -28,6 +28,7 @@ table of where each kind of change goes. Then, as needed:
 | [docs/auth-dex.md](docs/auth-dex.md) | Before touching identity, admin checks, or the audit log |
 | [docs/traefik-forward-auth.md](docs/traefik-forward-auth.md) | Before touching the container stack |
 | [docs/container-images.md](docs/container-images.md) | Before writing a Dockerfile, or adding a binary that ships as its own image |
+| [docs/build-info.md](docs/build-info.md) | Before touching how a build names its commit, the admin footer, or the reload bar |
 
 ## Commands
 
@@ -70,6 +71,9 @@ The full text, with the reasoning and the examples, is in
   rule.
 - **A case package is for logic, not for a query.** A resolver that only
   forwards to one sqlc method calls it from `graph.Env`.
+- **The admin always shows the build's commit and time**, stamped with
+  `-ldflags -X` because a docker build has no `.git`; a build without one is
+  `dev`, never a made-up hash. See [docs/build-info.md](docs/build-info.md).
 - **Infrastructure failure is an `error`. Domain failure is an `ErrorPayload`
   with a nil error.**
 - **Migrations**: show the SQL and wait for confirmation before creating the

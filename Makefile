@@ -1,5 +1,5 @@
 # No -X main.GitCommit here: a local build is not a deployed one and its footer
-# says `dev`. Only the image build is told a revision — see the Dockerfile.
+# says `dev`. Only the image build is told a revision — see docs/build-info.md.
 LDFLAGS := -s -w
 
 .PHONY: dev mol-dev run build build-amd64 test lint fmt generate gqlgen sqlc moq \

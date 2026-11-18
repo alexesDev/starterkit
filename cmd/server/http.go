@@ -32,14 +32,14 @@ func (a *app) routes() http.Handler {
 		_, _ = w.Write([]byte("ready"))
 	})
 
-	mux.Handle("POST "+base+"/graphql", limitBody(a.requireIdentity(graph.NewHandler(a))))
+	mux.Handle("POST "+base+"/graphql", limitBody(a.requireIdentity(a.build.Announce(graph.NewHandler(a)))))
 
 	if a.config.DevMode {
 		mux.Handle("GET "+base+"/graphql", a.requireIdentity(playgroundPolicy(playground.Handler("Starterkit", base+"/graphql"))))
 	}
 
 	mux.Handle("GET "+base+"/settings.js", a.requireIdentity(settingsScript(base)))
-	mux.Handle("GET /", a.requireIdentity(assets.SPAHandler(base, a.buildCommit)))
+	mux.Handle("GET /", a.requireIdentity(assets.SPAHandler(base, a.build.Revision())))
 
 	return securityHeaders(a.withRequest(mux))
 }

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loginViaDex } from './helpers/session';
-import { ADMIN, ADMIN_STATE_PATH, PANEL_COMMIT } from './helpers/constants';
+import { ADMIN, ADMIN_STATE_PATH, BASE_PATH, PANEL_COMMIT } from './helpers/constants';
 import { apiContext, gql } from './helpers/api';
 
 test('admin logs in once, lands on the SPA, and is bootstrapped as admin', async ({ page }) => {
@@ -31,18 +31,42 @@ test.describe('replaying the session the login above cached', () => {
 		await page.goto('/');
 
 		await expect(page.getByText(ADMIN.email).first()).toBeVisible();
-		await expect(page.getByText(PANEL_COMMIT, { exact: true })).toBeVisible();
+		await expect(page.getByText(PANEL_COMMIT.slice(0, 7), { exact: true })).toBeVisible();
+		await expect(page.getByText('dev', { exact: true })).toHaveCount(0);
 	});
 
-	test('buildGitCommit answers the same revision the footer shows', async () => {
+	test('build answers the revision the footer shows, and every answer carries it', async () => {
 		const api = await apiContext(ADMIN_STATE_PATH);
 		try {
-			const result = await gql(api, '{ admin { buildGitCommit } }');
+			const response = await api.post(`${BASE_PATH}/graphql`, {
+				data: { query: '{ admin { build { commit builtAt { unix } } } }' },
+			});
+			const result = await response.json();
+
 			expect(result.errors).toBeUndefined();
-			expect(result.data.admin.buildGitCommit).toBe(PANEL_COMMIT);
+			expect(result.data.admin.build.commit).toBe(PANEL_COMMIT);
+			expect(result.data.admin.build.builtAt.unix).toBeGreaterThan(0);
+			expect(response.headers()['x-build-commit']).toBe(PANEL_COMMIT);
 		} finally {
 			await api.dispose();
 		}
+	});
+
+	test('an answer from another build asks for a reload, and the reload clears it', async ({ page }) => {
+		const graphql = `**${BASE_PATH}/graphql`;
+		await page.route(graphql, async (route) => {
+			const response = await route.fetch();
+			await route.fulfill({ response, headers: { ...response.headers(), 'x-build-commit': 'f'.repeat(40) } });
+		});
+
+		await page.goto('/');
+		await expect(page.getByText('A new version is deployed')).toBeVisible();
+
+		await page.unroute(graphql);
+		await page.getByRole('button', { name: 'Reload' }).click();
+
+		await expect(page.getByText(ADMIN.email).first()).toBeVisible();
+		await expect(page.getByText('A new version is deployed')).toHaveCount(0);
 	});
 });
 

@@ -141,7 +141,7 @@ type AdminQuery {
   user(id: Int64!): AdminUser
   admins: AdminsConnection!
   auditLog(limit: Int64! = 50, before: Int64): AuditLogConnection!
-  buildGitCommit: String!
+  build: Build!
 }
 ```
 

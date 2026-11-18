@@ -13,13 +13,12 @@ namespace $.$$ {
 			return this.viewer().role === 'ADMIN'
 		}
 
-		@$mol_mem
-		git_commit() {
-			return this.is_admin() ? $starterkit_app_build().admin.buildGitCommit : ''
+		override signature_content() {
+			return this.is_admin() ? [this.User(), this.Build()] : [this.User()]
 		}
 
-		override signature_content() {
-			return this.git_commit() ? [this.User(), this.Build()] : [this.User()]
+		override menu_foot() {
+			return this.$.$starterkit_buildinfo.stale() ? [this.Foot(), this.Skew()] : [this.Foot()]
 		}
 
 		@$mol_mem

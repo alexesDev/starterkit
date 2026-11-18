@@ -34,12 +34,16 @@ namespace $ {
 
 		if (!mutation && revalidate) $starterkit_gql_marker_watch()
 
-		const res = $mol_fetch.json(path, {
+		const response = $mol_fetch.success(path, {
 			method: 'POST',
 			credentials: 'include',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ query, variables }),
-		}) as { data?: unknown, errors?: { message: string, path?: string[] }[] }
+		})
+
+		$starterkit_buildinfo.notice(response)
+
+		const res = response.json() as { data?: unknown, errors?: { message: string, path?: string[] }[] }
 
 		if (res.errors) throw new $starterkit_gql_error('GraphQL Error', res.errors)
 

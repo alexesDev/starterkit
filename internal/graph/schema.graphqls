@@ -54,7 +54,13 @@ type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
   user(id: Int64!): AdminUser
   admins: AdminsConnection!
   auditLog(limit: Int64! = 50, before: Int64): AuditLogConnection!
-  buildGitCommit: String!
+  build: Build!
+}
+
+type Build @goModel(model: "starterkit/internal/buildinfo.Info") {
+  commit: String
+  builtAt: Timestamp
+  commitUrl: String
 }
 
 type AdminMutation @goModel(model: "starterkit/internal/model.AdminMutation") {

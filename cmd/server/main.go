@@ -15,6 +15,7 @@ import (
 	goqitejobs "maragu.dev/goqite/jobs"
 
 	"starterkit/internal/appconfig"
+	"starterkit/internal/buildinfo"
 	"starterkit/internal/cronjobs"
 	"starterkit/internal/db"
 	"starterkit/internal/gateauth"
@@ -24,7 +25,10 @@ import (
 )
 
 //nolint:gochecknoglobals // -X can only target a package-level var.
-var GitCommit = "dev"
+var (
+	GitCommit string
+	BuildTime string
+)
 
 func main() {
 	err := run()
@@ -41,10 +45,6 @@ func run() error {
 	}
 
 	if err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return nil
-		}
-
 		return err
 	}
 
@@ -168,6 +168,12 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 		return nil, err
 	}
 
+	build, err := buildinfo.New(GitCommit, BuildTime, config.RepoURL)
+	if err != nil {
+		conns.Close()
+		return nil, err
+	}
+
 	queries := db.New(conns.Read)
 	writeQueries := db.NewWriteQueries(conns.Write)
 
@@ -187,15 +193,15 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 
 	a := &app{
 		appState: &appState{
-			config:      config,
-			buildCommit: GitCommit,
-			log:         log,
-			conns:       conns,
-			baseWrite:   writeQueries,
-			gate:        gate,
-			queue:       queue,
-			jobRunner:   goqitejobs.NewRunner(runnerOpts),
-			cronRunner:  cronjobs.New(ctx, log),
+			config:     config,
+			build:      build,
+			log:        log,
+			conns:      conns,
+			baseWrite:  writeQueries,
+			gate:       gate,
+			queue:      queue,
+			jobRunner:  goqitejobs.NewRunner(runnerOpts),
+			cronRunner: cronjobs.New(ctx, log),
 		},
 		Queries:      queries,
 		WriteQueries: writeQueries,

@@ -1,0 +1,8 @@
+$starterkit_buildinfo_skew $mol_view
+	sub /
+		<= Message $mol_view
+			sub /
+				\A new version is deployed
+		<= Reload $mol_button_minor
+			title \Reload
+			click? <=> reload? null

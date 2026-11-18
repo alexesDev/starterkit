@@ -48,7 +48,7 @@ on it without a cycle. A check that relates two services stays in
 
 | Package | Settings |
 |---|---|
-| `appconfig` | `addr`, `public-url`, `base-path`, `database-url`, `sign-out-url`, `bootstrap-admin`, `dev-mode`, `shutdown-delay`, `shutdown-timeout` |
+| `appconfig` | `addr`, `public-url`, `base-path`, `database-url`, `repo-url`, `sign-out-url`, `bootstrap-admin`, `dev-mode`, `shutdown-delay`, `shutdown-timeout` |
 | `gateauth` | `oidc-issuer`, `oidc-client-id` |
 | `audit` | `audit-retention`, `audit-purge-spec` |
 | `notifier` | `notifier-from` |

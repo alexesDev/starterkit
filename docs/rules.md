@@ -507,6 +507,16 @@ invisible above `app`.
 If it does not compile, `app` is missing a method — that is the wiring check
 working, not a problem.
 
+## The admin names its build
+
+The admin always shows the commit and the build time of the binary it runs. A
+build that was not told its commit is labelled `dev`, never given a made-up
+hash. The commit arrives through `-ldflags -X`, not `debug.ReadBuildInfo`: a
+`docker build` context has no `.git`, so Go cannot stamp `vcs.revision` there
+and would silently stamp nothing. Every GraphQL answer carries the commit in
+`X-Build-Commit`, and a tab whose bundle came from another commit offers a
+reload. The mechanism and its tests are in [build-info.md](build-info.md).
+
 ## Migrations
 
 Show the SQL and wait for confirmation before creating the file. `make db-up` /

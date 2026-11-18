@@ -111,6 +111,8 @@ linters:
               desc: use github.com/google/uuid instead, satori's package is not maintained
             - pkg: github.com/gofrs/uuid$
               desc: use github.com/gofrs/uuid/v5 or later, it was not a go module before v5
+            - pkg: github.com/stretchr/testify/assert
+              desc: use github.com/stretchr/testify/require, a failed check stops the test
         "non-test files":
           files:
             - "!$test"

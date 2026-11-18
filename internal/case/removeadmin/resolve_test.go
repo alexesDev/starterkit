@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/removeadmin"
@@ -26,7 +25,7 @@ func TestResolveRevokesTheGrantAndCountsIt(t *testing.T) {
 	_, ok := result.(*model.RemoveAdminPayload)
 	require.True(t, ok, "expected success, got %#v", result)
 
-	assert.Len(t, env.MetricsIncreaseAdminChangedCalls(), 1)
+	require.Len(t, env.MetricsIncreaseAdminChangedCalls(), 1)
 }
 
 func TestResolveRefusesToRemoveTheLastAdmin(t *testing.T) {
@@ -44,8 +43,8 @@ func TestResolveRefusesToRemoveTheLastAdmin(t *testing.T) {
 	refusal, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Equal(t, "the last admin cannot be removed", refusal.Message)
-	assert.Empty(t, env.MetricsIncreaseAdminChangedCalls(), "a refused removal must not be counted")
+	require.Equal(t, "the last admin cannot be removed", refusal.Message)
+	require.Empty(t, env.MetricsIncreaseAdminChangedCalls(), "a refused removal must not be counted")
 }
 
 func TestResolveTreatsAUserWhoWasNeverAnAdminAsAlreadyDone(t *testing.T) {
@@ -74,5 +73,5 @@ func TestResolveRefusesSelfRemoval(t *testing.T) {
 	_, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Empty(t, env.DBDeleteAdminCalls(), "self-removal must not reach the delete")
+	require.Empty(t, env.DBDeleteAdminCalls(), "self-removal must not reach the delete")
 }

@@ -94,7 +94,7 @@ the two traps it has, and the build check that keeps it true are in
   `sql.NullString`.
 
 The queue's table is the single place holding text timestamps. It is goqite's
-own schema, vendored verbatim, and its columns are named `created`, `updated`
+own schema with `strict` added, and its columns are named `created`, `updated`
 and `timeout` — outside our `_at`/`_date` convention, so no override matches
 them and nothing in Go reads them.
 

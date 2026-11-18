@@ -37,7 +37,7 @@ A GraphQL resolver is a thin adapter:
 
 ```go
 func (r *adminMutationResolver) UnbanUser(ctx context.Context, obj *model1.AdminMutation, input model.UnbanUserInput) (model.UnbanUserOrErrorPayload, error) {
-	return r.env(ctx).UnbanUser(ctx, input)
+	return r.Env.UnbanUser(ctx, input)
 }
 ```
 
@@ -163,7 +163,7 @@ them deletes the feature:
 
 ```go
 // cmd/server/jobs.go — jobs.Register captures a typed env in a closure
-jobs.Register(a, jobNotifyUserBanned, 0, func(ctx context.Context, params notifyuserbanned.Input) error {
+jobs.Register(a, jobNotifyUserBanned, func(ctx context.Context, params notifyuserbanned.Input) error {
 	return notifyuserbanned.Resolve(ctx, a, params)
 })
 ```
@@ -198,7 +198,7 @@ type Env interface {
 **One difference from the essay is worth knowing, because it is a consequence of
 a decision made elsewhere in this kit.** The essay's `graph.Env` *embeds* the
 case contracts — `hidenotes.Env`, `pushnotes.Env` — because there a resolver
-calls `hidenotes.Resolve(ctx, r.env(ctx), input)` and therefore needs everything
+calls `hidenotes.Resolve(ctx, r.Env, input)` and therefore needs everything
 the case needs. Here a resolver calls a *command* on `app`, because a command
 owns its transaction ([graphql.md](graphql.md)), so what the edge needs is the
 command signature, not the case's dependencies.
@@ -241,7 +241,7 @@ Go has no covariant return types. The answer is that transactions belong to the
 `*app` — a copy with transaction-bound queries:
 
 ```go
-func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app) (bool, error)) error
+func (a *app) WithTransaction(ctx context.Context, fn func(context.Context, *app) error) error
 ```
 
 Cases know nothing about transactions. The covariance problem is not solved; it
@@ -342,14 +342,13 @@ Where the wiring stayed static, nothing rotted in seven years.
 
 ## Places the pattern is deliberately not pressed all the way
 
-**Two runtime casts, both at a boundary and both deliberate.**
-`Resolver.env(ctx)` casts the request-scoped `req.Env` to `graph.Env`, and
-`app.txEnvFromCtx` casts it to `*app` to find an open transaction. Removing them
-would mean giving up context-carried env, and that is the same mechanism that
-swaps the env inside a transaction. They stay, backed from the other side by
-`graph.NewHandler(a)`, which the compiler checks. Neither is the anti-pattern
-above: neither reaches for a *foreign case's* contract in the middle of business
-logic.
+**One runtime cast, at a boundary and deliberate.** `app.txEnvFromCtx` casts a
+context value to `*app` to find an open transaction, so `EnqueueJob` writes into
+it and a nested `WithTransaction` is refused instead of deadlocking. The
+resolver needs no cast: it holds `graph.Env` as a field, set once by
+`graph.NewHandler(a)`, which the compiler checks. The cast is not the
+anti-pattern above: it never reaches for a *foreign case's* contract in the
+middle of business logic.
 
 **Transport machinery in the transport layer.** A subscription pump, a file
 upload, a streaming response: that is plumbing, and it has no business in a

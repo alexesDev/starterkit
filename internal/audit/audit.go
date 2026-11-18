@@ -1,8 +1,8 @@
 // Package audit records crossings of the admin boundary.
 //
-// A Writer must write outside any request transaction: a denied admin
-// operation rolls its transaction back, and the record of the attempt has to
-// survive that. See docs/auth-dex.md.
+// A Writer must write outside any request transaction: the command an entry
+// describes may fail and roll its transaction back, and the record of the
+// attempt has to survive that. See docs/auth-dex.md.
 package audit
 
 import "context"

@@ -179,10 +179,12 @@ Every crossing is recorded in `audit_log`:
 `app.WriteAudit` uses `appState.baseWrite`, never the request's transaction
 handle. This is deliberate and easy to get wrong.
 
-A denied admin mutation returns an error, so `runInTx` rolls the transaction
-back. Had the audit row been written inside that transaction it would be rolled
-back too — and the record of the attempt would vanish exactly when it matters
-most.
+The entry for an admin mutation is written by `checkAdmin`, when the `admin`
+namespace resolves — before the command under it opens its transaction. A
+denial never reaches a transaction at all; an allowed mutation whose case then
+fails returns an error, and `runInTx` rolls its transaction back. Had the audit
+row been written inside that transaction, the record of the attempt would vanish
+together with the work it describes — exactly when it matters most.
 
 Inside a request `WriteAudit` only buffers, and the middleware flushes once the
 transaction is released; writing immediately would deadlock against the single

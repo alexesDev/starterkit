@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/unbanuser"
@@ -21,8 +20,8 @@ func TestResolveLiftsTheBan(t *testing.T) {
 	success, ok := result.(*model.UnbanUserPayload)
 	require.True(t, ok, "expected success, got %#v", result)
 
-	assert.Equal(t, int64(2), success.UserID)
-	assert.Len(t, env.DBDeleteUserBanCalls(), 1)
+	require.Equal(t, int64(2), success.UserID)
+	require.Len(t, env.DBDeleteUserBanCalls(), 1)
 }
 
 func TestResolveIsIdempotentForAUserWhoWasNotBanned(t *testing.T) {
@@ -44,7 +43,7 @@ func TestResolveRefusesANonPositiveUserID(t *testing.T) {
 	_, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Empty(t, env.DBDeleteUserBanCalls())
+	require.Empty(t, env.DBDeleteUserBanCalls())
 }
 
 func TestResolvePropagatesADeleteFailure(t *testing.T) {

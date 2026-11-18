@@ -6,7 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/notifyuserbanned"
@@ -41,9 +40,9 @@ func TestResolveTellsTheBannedPersonWhy(t *testing.T) {
 
 	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, input))
 
-	assert.Equal(t, notifier.Address("user@example.com"), sent)
-	assert.Equal(t, "spam", reason)
-	assert.Equal(t, input.Key, key, "the key minted at the enqueue must reach the delivery, not a fresh one")
+	require.Equal(t, notifier.Address("user@example.com"), sent)
+	require.Equal(t, "spam", reason)
+	require.Equal(t, input.Key, key, "the key minted at the enqueue must reach the delivery, not a fresh one")
 }
 
 func TestResolveIsDoneWhenTheUserIsGone(t *testing.T) {
@@ -54,7 +53,7 @@ func TestResolveIsDoneWhenTheUserIsGone(t *testing.T) {
 	}
 
 	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, notifyuserbanned.Input{UserID: 2}))
-	assert.Empty(t, env.NotifyUserBannedCalls())
+	require.Empty(t, env.NotifyUserBannedCalls())
 }
 
 func TestResolveIsDoneWhenTheBanWasLiftedBeforeTheJobRan(t *testing.T) {
@@ -68,7 +67,7 @@ func TestResolveIsDoneWhenTheBanWasLiftedBeforeTheJobRan(t *testing.T) {
 	}
 
 	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, notifyuserbanned.Input{UserID: 2}))
-	assert.Empty(t, env.NotifyUserBannedCalls(), "an unbanned user must not be told they are banned")
+	require.Empty(t, env.NotifyUserBannedCalls(), "an unbanned user must not be told they are banned")
 }
 
 func TestResolvePropagatesADeliveryFailureSoTheJobRetries(t *testing.T) {
@@ -112,5 +111,5 @@ func TestARetryAfterAFailedDeliveryCarriesTheSameKey(t *testing.T) {
 	require.Error(t, notifyuserbanned.Resolve(t.Context(), env, input), "an unknown outcome must reach the queue so it retries")
 	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, input))
 
-	assert.Equal(t, []notifier.IdempotencyKey{input.Key, input.Key}, keys, "the retry must resend the key, not mint one")
+	require.Equal(t, []notifier.IdempotencyKey{input.Key, input.Key}, keys, "the retry must resend the key, not mint one")
 }

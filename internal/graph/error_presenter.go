@@ -13,15 +13,6 @@ import (
 	"starterkit/internal/model"
 )
 
-// errorPresenter decides what a caller is allowed to read.
-//
-// A resolver error wraps whatever it was given — a driver error naming a
-// column, an HTTP failure naming a URL with a credential in its path — so the
-// default is to log the cause and hand back a reference the caller can quote.
-// Two things pass through unchanged, because they carry no information the
-// caller did not already have: parser and validator errors, which arrive as a
-// *gqlerror.Error wrapping nothing, and ErrNotAdmin, which says only that the
-// boundary refused and which the admin namespace already recorded.
 func errorPresenter(log logger.Logger) graphql.ErrorPresenterFunc {
 	return func(ctx context.Context, err error) *gqlerror.Error {
 		if errors.Is(err, model.ErrNotAdmin) {

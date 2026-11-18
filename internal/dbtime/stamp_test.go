@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/dbtime"
@@ -14,7 +13,7 @@ func TestAtNormalisesToUTC(t *testing.T) {
 	zone := time.FixedZone("UTC+3", 3*60*60)
 	moment := time.Date(2026, time.August, 10, 12, 30, 0, 0, zone)
 
-	assert.Equal(t, "2026-08-10T09:30:00Z", dbtime.At(moment).Format(time.RFC3339))
+	require.Equal(t, "2026-08-10T09:30:00Z", dbtime.At(moment).Format(time.RFC3339))
 }
 
 func TestValueIsUnixSeconds(t *testing.T) {
@@ -23,21 +22,21 @@ func TestValueIsUnixSeconds(t *testing.T) {
 	value, err := moment.Value()
 	require.NoError(t, err)
 
-	assert.Equal(t, moment.Unix(), value)
+	require.Equal(t, moment.Unix(), value)
 }
 
 func TestScanReadsUnixSeconds(t *testing.T) {
 	var stamp dbtime.Stamp
 
 	require.NoError(t, stamp.Scan(int64(1786000000)))
-	assert.Equal(t, time.Unix(1786000000, 0).UTC(), stamp.Time)
+	require.Equal(t, time.Unix(1786000000, 0).UTC(), stamp.Time)
 }
 
 func TestScanReadsNullAsTheZeroStamp(t *testing.T) {
 	stamp := dbtime.At(time.Now())
 
 	require.NoError(t, stamp.Scan(nil))
-	assert.True(t, stamp.IsZero())
+	require.True(t, stamp.IsZero())
 }
 
 func TestScanRefusesAnythingElse(t *testing.T) {
@@ -56,17 +55,17 @@ func TestAStampRoundTripsThroughItsOwnValue(t *testing.T) {
 	var back dbtime.Stamp
 	require.NoError(t, back.Scan(value))
 
-	assert.True(t, original.Equal(back.Time))
+	require.True(t, original.Equal(back.Time))
 }
 
 func TestFormattedTakesAGoReferenceLayout(t *testing.T) {
 	moment := dbtime.At(time.Date(2026, time.August, 10, 9, 30, 15, 0, time.UTC))
 
-	assert.Equal(t, "2026-08-10 09:30", moment.Formatted("2006-01-02 15:04"))
+	require.Equal(t, "2026-08-10 09:30", moment.Formatted("2006-01-02 15:04"))
 }
 
 func TestTheSchemaDefaultLayoutIsRFC3339(t *testing.T) {
 	moment := dbtime.At(time.Date(2026, time.August, 10, 9, 30, 15, 0, time.UTC))
 
-	assert.Equal(t, "2026-08-10T09:30:15Z", moment.Formatted("2006-01-02T15:04:05Z07:00"))
+	require.Equal(t, "2026-08-10T09:30:15Z", moment.Formatted("2006-01-02T15:04:05Z07:00"))
 }

@@ -21,10 +21,6 @@ type Input struct {
 	Key    notifier.IdempotencyKey `json:"key"`
 }
 
-// Resolve tells a banned person why. It runs from the queue, after the
-// transaction that wrote the ban has committed, so both the user and the ban
-// may be gone by the time it runs: an unban between the enqueue and the run is
-// the answer, not a failure, and retrying would not bring the row back.
 func Resolve(ctx context.Context, env Env, input Input) error {
 	user, err := env.DBGetUserByID(ctx, input.UserID)
 	if err != nil {

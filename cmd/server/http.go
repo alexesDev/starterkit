@@ -44,8 +44,6 @@ func (a *app) routes() http.Handler {
 	return securityHeaders(a.withRequest(mux))
 }
 
-// settingsScript is a real file rather than an inline snippet in the shell:
-// the CSP has no unsafe-inline for scripts, and an inline one would be blocked.
 func settingsScript(basePath string) http.Handler {
 	settings := struct {
 		GraphQLURL string `json:"graphqlUrl"`
@@ -99,10 +97,9 @@ func limitBody(next http.Handler) http.Handler {
 
 func (a *app) withRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req := appreq.New(a, w, r, clientip.Resolve(r, a.config.TrustedProxies))
+		req := appreq.New(clientip.Resolve(r, a.config.TrustedProxies))
 		ctx := req.NewContext(r.Context())
 		r = r.WithContext(ctx)
-		req.R = r
 
 		identity, err := a.resolveIdentity(req, r)
 		if err != nil {
@@ -128,10 +125,6 @@ func (a *app) withRequest(next http.Handler) http.Handler {
 	})
 }
 
-// refuseStaleToken redirects a browser navigation to the gate's sign-out
-// endpoint, so a session the IdP can no longer vouch for ends itself. Anything
-// that is not a navigation gets its 401, because redirecting an API call to a
-// sign-in page hands the client HTML where it expects JSON.
 func (a *app) refuseStaleToken(w http.ResponseWriter, r *http.Request) {
 	if isNavigation(r) {
 		http.Redirect(w, r, a.config.SignOutURL, http.StatusSeeOther)
@@ -156,8 +149,6 @@ func isNavigation(r *http.Request) bool {
 	return strings.Contains(r.Header.Get("Accept"), "text/html")
 }
 
-// requireIdentity is the application's own gate, and it is the second one:
-// Traefik refuses unauthenticated requests before they reach the process.
 func (a *app) requireIdentity(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req, err := appreq.FromCtx(r.Context())

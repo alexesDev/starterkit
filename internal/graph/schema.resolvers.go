@@ -19,22 +19,22 @@ import (
 
 // BanUser is the resolver for the banUser field.
 func (r *adminMutationResolver) BanUser(ctx context.Context, obj *model1.AdminMutation, input model.BanUserInput) (model.BanUserOrErrorPayload, error) {
-	return r.env(ctx).BanUser(ctx, input)
+	return r.Env.BanUser(ctx, input)
 }
 
 // UnbanUser is the resolver for the unbanUser field.
 func (r *adminMutationResolver) UnbanUser(ctx context.Context, obj *model1.AdminMutation, input model.UnbanUserInput) (model.UnbanUserOrErrorPayload, error) {
-	return r.env(ctx).UnbanUser(ctx, input)
+	return r.Env.UnbanUser(ctx, input)
 }
 
 // MakeAdmin is the resolver for the makeAdmin field.
 func (r *adminMutationResolver) MakeAdmin(ctx context.Context, obj *model1.AdminMutation, input model.MakeAdminInput) (model.MakeAdminOrErrorPayload, error) {
-	return r.env(ctx).MakeAdmin(ctx, input)
+	return r.Env.MakeAdmin(ctx, input)
 }
 
 // RemoveAdmin is the resolver for the removeAdmin field.
 func (r *adminMutationResolver) RemoveAdmin(ctx context.Context, obj *model1.AdminMutation, input model.RemoveAdminInput) (model.RemoveAdminOrErrorPayload, error) {
-	return r.env(ctx).RemoveAdmin(ctx, input)
+	return r.Env.RemoveAdmin(ctx, input)
 }
 
 // Users is the resolver for the users field.
@@ -44,7 +44,7 @@ func (r *adminQueryResolver) Users(ctx context.Context, obj *model1.AdminQuery) 
 
 // User is the resolver for the user field.
 func (r *adminQueryResolver) User(ctx context.Context, obj *model1.AdminQuery, id int64) (*db.DBListUsersRow, error) {
-	row, err := r.env(ctx).DBGetAdminUserByID(ctx, id)
+	row, err := r.Env.DBGetAdminUserByID(ctx, id)
 	if db.IsNotFound(err) {
 		return nil, nil
 	}
@@ -65,12 +65,12 @@ func (r *adminQueryResolver) Admins(ctx context.Context, obj *model1.AdminQuery)
 
 // AuditLog is the resolver for the auditLog field.
 func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, limit int64, before *int64) (*model.AuditLogConnection, error) {
-	return r.env(ctx).ListAuditLog(ctx, limit, before)
+	return r.Env.ListAuditLog(ctx, limit, before)
 }
 
 // BuildGitCommit is the resolver for the buildGitCommit field.
 func (r *adminQueryResolver) BuildGitCommit(ctx context.Context, obj *model1.AdminQuery) (string, error) {
-	return r.env(ctx).BuildGitCommit(), nil
+	return r.Env.BuildGitCommit(), nil
 }
 
 // IsAdmin is the resolver for the isAdmin field.
@@ -80,7 +80,7 @@ func (r *adminUserResolver) IsAdmin(ctx context.Context, obj *db.DBListUsersRow)
 
 // TotalCount is the resolver for the totalCount field.
 func (r *adminsConnectionResolver) TotalCount(ctx context.Context, obj *model.AdminsConnection) (int64, error) {
-	count, err := r.env(ctx).DBCountAdmins(ctx)
+	count, err := r.Env.DBCountAdmins(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count admins: %w", err)
 	}
@@ -90,7 +90,7 @@ func (r *adminsConnectionResolver) TotalCount(ctx context.Context, obj *model.Ad
 
 // Nodes is the resolver for the nodes field.
 func (r *adminsConnectionResolver) Nodes(ctx context.Context, obj *model.AdminsConnection) ([]db.DBListAdminsRow, error) {
-	rows, err := r.env(ctx).DBListAdmins(ctx)
+	rows, err := r.Env.DBListAdmins(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list admins: %w", err)
 	}
@@ -100,7 +100,7 @@ func (r *adminsConnectionResolver) Nodes(ctx context.Context, obj *model.AdminsC
 
 // SignOut is the resolver for the signOut field.
 func (r *mutationResolver) SignOut(ctx context.Context) (*model.SignOutPayload, error) {
-	env := r.env(ctx)
+	env := r.Env
 	env.RecordSignOut(ctx)
 
 	return &model.SignOutPayload{RedirectURL: env.SignOutURL()}, nil
@@ -133,7 +133,7 @@ func (r *queryResolver) Admin(ctx context.Context) (*model1.AdminQuery, error) {
 
 // TotalCount is the resolver for the totalCount field.
 func (r *usersConnectionResolver) TotalCount(ctx context.Context, obj *model.UsersConnection) (int64, error) {
-	count, err := r.env(ctx).DBCountUsers(ctx)
+	count, err := r.Env.DBCountUsers(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count users: %w", err)
 	}
@@ -143,7 +143,7 @@ func (r *usersConnectionResolver) TotalCount(ctx context.Context, obj *model.Use
 
 // Nodes is the resolver for the nodes field.
 func (r *usersConnectionResolver) Nodes(ctx context.Context, obj *model.UsersConnection) ([]db.DBListUsersRow, error) {
-	rows, err := r.env(ctx).DBListUsers(ctx)
+	rows, err := r.Env.DBListUsers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
@@ -153,7 +153,7 @@ func (r *usersConnectionResolver) Nodes(ctx context.Context, obj *model.UsersCon
 
 // User is the resolver for the user field.
 func (r *viewerResolver) User(ctx context.Context, obj *model1.Viewer) (*db.User, error) {
-	return r.env(ctx).CurrentUser(ctx), nil
+	return r.Env.CurrentUser(ctx), nil
 }
 
 // Role is the resolver for the role field.

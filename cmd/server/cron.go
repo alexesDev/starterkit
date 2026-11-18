@@ -6,9 +6,6 @@ import (
 	"starterkit/internal/cronjobs"
 )
 
-// registerCronJobs schedules work; the queue runs it. Keeping the scheduler
-// free of the work itself means a slow job cannot delay the next tick of
-// anything else, and the job gets the queue's retry behaviour for free.
 func (a *app) registerCronJobs() error {
 	return a.cronRunner.Add(cronjobs.Job{
 		ID:   jobPurgeAuditLog,

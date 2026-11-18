@@ -45,13 +45,13 @@ behind an open transaction — separate pools, one lock. See
 `internal/jobs.Register` is the typed seam:
 
 ```go
-jobs.Register(a, jobNotifyUserBanned, 0, func(ctx context.Context, params notifyuserbanned.Input) error {
+jobs.Register(a, jobNotifyUserBanned, func(ctx context.Context, params notifyuserbanned.Input) error {
 	return notifyuserbanned.Resolve(ctx, a, params)
 })
 ```
 
-It registers the handler and returns an enqueue function in one call. The
-generic parameter exists only to unmarshal the payload — it is not a disguised
+It registers the handler and nothing else: enqueueing is a port the case
+declares on its own `Env`, as `banuser` does above. The generic parameter exists only to unmarshal the payload — it is not a disguised
 runtime type assertion. The handler closes over a typed `env`, so a job whose
 `Env` `app` does not satisfy fails to compile.
 
@@ -59,10 +59,9 @@ A job that writes must open its own transaction — there is no request middlewa
 out here:
 
 ```go
-jobs.Register(a, jobPurgeAuditLog, 0, func(ctx context.Context, _ struct{}) error {
-	return a.WithTransaction(ctx, func(txCtx context.Context, env *app) (bool, error) {
-		err := purgeauditlog.Resolve(txCtx, env)
-		return err == nil, err
+jobs.Register(a, jobPurgeAuditLog, func(ctx context.Context, _ struct{}) error {
+	return a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
+		return purgeauditlog.Resolve(txCtx, env)
 	})
 })
 ```

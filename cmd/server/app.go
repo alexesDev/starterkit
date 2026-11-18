@@ -18,13 +18,6 @@ import (
 	"starterkit/internal/notifier"
 )
 
-// app is the IO spine. Every Env interface in the system is satisfied by this
-// one struct, and the compiler is what proves it.
-//
-// The two-level split is load-bearing: app is shallow-copied to make a
-// transaction-scoped env, so only the fields that must change per transaction
-// live here. Everything process-lifetime lives behind the *appState pointer and
-// is shared by every copy. See docs/env-pattern.md.
 type app struct {
 	*appState
 
@@ -67,8 +60,6 @@ func (a *app) BuildGitCommit() string {
 	return a.buildCommit
 }
 
-// Now is UTC because SQLite writes current_timestamp in UTC and the audit purge
-// compares against it.
 func (a *app) Now() time.Time {
 	return time.Now().UTC()
 }
@@ -81,8 +72,6 @@ func (a *app) BootstrapAdminEmail() string {
 	return a.config.BootstrapAdmin
 }
 
-// TableRowCounts reads through the read pool, so it never contends with an open
-// write transaction.
 func (a *app) TableRowCounts(ctx context.Context) (map[string]int64, error) {
 	return db.TableRowCounts(ctx, a.conns.Read)
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func NewHandler(env Env) *handler.Server {
-	resolver := Resolver{DefaultEnv: env}
+	resolver := Resolver{Env: env}
 	executable := generated.NewExecutableSchema(generated.Config{Resolvers: &resolver})
 	srv := handler.New(executable)
 

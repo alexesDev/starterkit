@@ -16,10 +16,6 @@ var shell embed.FS
 //go:embed all:ui
 var ui embed.FS
 
-// SPAHandler serves the built bundle under /ui/ and falls back to the shell for
-// everything else, so client-side routes survive a reload. The shell's
-// placeholders are resolved once, here, so the settings script follows the
-// configured prefix and static assets change URL on every deploy.
 func SPAHandler(basePath, revision string) http.Handler {
 	uiFS, err := fs.Sub(ui, "ui")
 	if err != nil {

@@ -104,7 +104,9 @@ not per type. Three kinds of divergence, all of them real in this kit:
   `return obj.IsAdmin != 0, nil`.
 - **Deferred to another query.** `UsersConnection.totalCount` and `nodes` are
   both forced resolvers over an empty marker struct, so a client asking for
-  `nodes` alone never pays for the `count(*)`.
+  `nodes` alone never pays for the `count(*)`. `AdminsConnection` works the
+  same way. `auditLog` does not: it is a page, and `listauditlog` counts the
+  whole table on every call.
 - **Given behaviour.** Every time column binds to `dbtime.Stamp`, and the
   `Timestamp` object type resolves its fields to methods on it, so `formatted`
   and `unix` exist on every timestamp in the API without a resolver anywhere.

@@ -1,12 +1,11 @@
-// Package appreq carries the per-request Env through context, because gqlgen
-// resolvers are generated with fixed signatures and cannot take it as an
-// argument.
+// Package appreq carries what the request itself establishes, the caller's
+// identity, client address and buffered audit entries, through context,
+// because gqlgen resolvers are generated with fixed signatures.
 package appreq
 
 import (
 	"context"
 	"errors"
-	"net/http"
 	"sync"
 
 	"starterkit/internal/audit"
@@ -18,10 +17,6 @@ type ctxKeyType struct{}
 var ErrNotFound = errors.New("request not found in context")
 
 type Request struct {
-	Env any
-	R   *http.Request
-	W   http.ResponseWriter
-
 	user    *db.User
 	isAdmin bool
 	ip      string
@@ -30,8 +25,8 @@ type Request struct {
 	audits []audit.Entry
 }
 
-func New(env any, w http.ResponseWriter, r *http.Request, ip string) *Request {
-	return &Request{Env: env, R: r, W: w, ip: ip}
+func New(ip string) *Request {
+	return &Request{ip: ip}
 }
 
 func (c *Request) AddAudit(entry audit.Entry) {

@@ -90,7 +90,7 @@ type Env interface {
 	MetricsIncreaseNotification(ctx context.Context, kind string)
 }
 
-func New(env Env, config Config) *Notifier
+func New(env Env, from Address, origin Origin) *Notifier
 
 func (n *Notifier) NotifyUserBanned(ctx context.Context, key IdempotencyKey, to Address, reason string) error
 ```
@@ -109,7 +109,7 @@ and `newApp` constructs it against `a` itself, after `a` exists:
 
 ```go
 a.Metrics = metrics.New(a, config.Metrics)
-a.Notifier = notifier.New(a, config.Notifier)
+a.Notifier = notifier.New(a, config.NotifierFrom, notifier.Origin(config.PublicURL))
 ```
 
 A case that wants to send a notice names the promoted method on its own `Env`
@@ -127,21 +127,17 @@ type Env interface {
 Three properties fall out of that shape. The service is testable on its own,
 because its `Env` is two methods. The case is testable without it, because
 `moq` generates a `NotifyUserBanned` stub from the case's own contract. And
-replacing the delivery — the kit's notifier writes to the log, or posts to an
-HTTP relay when `STARTERKIT_NOTIFIER_URL` is set; another one dials SMTP —
-changes one file and no case, because the seam is the service, not the call
-site.
+replacing the delivery — the kit's notifier writes to the log; a real one dials
+SMTP — changes one file and no case, because the seam is the service, not the
+call site.
 
 The same trick handles the awkward moment in `newApp`: a service whose `Env` is
 `app` cannot be built before `app` exists, so it is assigned onto `a`
 afterwards. `metrics.Metrics` has the same shape and the same two lines.
 
-The values are named types (`notifier.Address`, `notifier.Origin`,
-`notifier.Endpoint`, `notifier.IdempotencyKey`) rather than bare strings,
-because a call taking four strings is a call whose arguments can be swapped
-silently — see [rules.md](rules.md). The configuration arrives as one
-`notifier.Config` that `internal/appconfig` fills, so a new setting is a field,
-not another constructor argument.
+The parameters are named types (`notifier.Address`, `notifier.Origin`) rather
+than bare strings, because a constructor taking three strings is a constructor
+whose arguments can be swapped silently — see [rules.md](rules.md).
 
 ## Wiring is a compile error, not a runtime one
 

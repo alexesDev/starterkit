@@ -86,3 +86,31 @@ func TestResolvePropagatesADeliveryFailureSoTheJobRetries(t *testing.T) {
 
 	require.Error(t, notifyuserbanned.Resolve(t.Context(), env, notifyuserbanned.Input{UserID: 2}))
 }
+
+func TestARetryAfterAFailedDeliveryCarriesTheSameKey(t *testing.T) {
+	var keys []notifier.IdempotencyKey
+
+	env := &EnvMock{
+		DBGetUserByIDFunc: func(_ context.Context, id int64) (db.User, error) {
+			return db.User{ID: id, Email: "user@example.com"}, nil
+		},
+		DBGetUserBanFunc: func(_ context.Context, userID int64) (db.UserBan, error) {
+			return db.UserBan{UserID: userID, Reason: "spam"}, nil
+		},
+		NotifyUserBannedFunc: func(_ context.Context, key notifier.IdempotencyKey, _ notifier.Address, _ string) error {
+			keys = append(keys, key)
+			if len(keys) == 1 {
+				return errors.New("the delivery timed out, its outcome is unknown")
+			}
+
+			return nil
+		},
+	}
+
+	input := notifyuserbanned.Input{UserID: 2, Key: "minted-at-enqueue"}
+
+	require.Error(t, notifyuserbanned.Resolve(t.Context(), env, input), "an unknown outcome must reach the queue so it retries")
+	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, input))
+
+	assert.Equal(t, []notifier.IdempotencyKey{input.Key, input.Key}, keys, "the retry must resend the key, not mint one")
+}

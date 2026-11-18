@@ -231,10 +231,12 @@ the line safe, it makes the leak small and the line readable; the expected
 statuses carry no body at all because they are the common case, and the common
 case is where a leak repeats.
 
-`internal/notifier` is the worked example. It reads no more of the body than it
-can use, keeps the first line, and cuts it on a character boundary:
+The helper reads no more of the body than it can use, keeps the first line, and
+cuts it on a character boundary:
 
 ```go
+const errorBodyLimit = 200
+
 func errorBodyLine(resp *http.Response) string {
 	head, err := io.ReadAll(io.LimitReader(resp.Body, errorBodyLimit*4))
 	if err != nil && len(head) == 0 {
@@ -254,8 +256,9 @@ func errorBodyLine(resp *http.Response) string {
 
 The same goes for the error value: `fmt.Errorf("... %s", body)` puts the body in
 every log line that error reaches, so the error carries the status and the
-capped line, never the body. The notifier's error is the only place its line
-appears; the job runner logs that error, once.
+capped line, never the body, and whoever logs the error logs it once. The HTTP
+delivery sketched in [jobs-and-cron.md](jobs-and-cron.md) shows the helper in
+place.
 
 ## Go error style
 

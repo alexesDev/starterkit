@@ -38,7 +38,7 @@ type Config struct {
 	AuditRetention time.Duration
 	AuditPurgeSpec string
 
-	Notifier notifier.Config
+	NotifierFrom notifier.Address
 
 	TrustedProxies []netip.Prefix
 
@@ -81,13 +81,6 @@ func Get() (*Config, error) {
 	fs.StringVar(&cfg.AuditPurgeSpec, "audit-purge-spec", env("STARTERKIT_AUDIT_PURGE_SPEC", "0 4 * * *"), "cron spec for the audit retention sweep")
 
 	notifierFrom := fs.String("notifier-from", env("STARTERKIT_NOTIFIER_FROM", "noreply@example.invalid"), "sender address every notice is delivered from")
-	notifierURL := fs.String("notifier-url", env("STARTERKIT_NOTIFIER_URL", ""), "HTTP relay every notice is posted to; empty writes notices to the log")
-	fs.DurationVar(
-		&cfg.Notifier.Timeout,
-		"notifier-timeout",
-		envDuration("STARTERKIT_NOTIFIER_TIMEOUT", 10*time.Second),
-		"how long a post to the relay may take before its outcome counts as unknown",
-	)
 	trusted := fs.String(
 		"trusted-proxies",
 		env("STARTERKIT_TRUSTED_PROXIES", "127.0.0.1/32,::1/128"),
@@ -101,9 +94,7 @@ func Get() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse flags: %w", err)
 	}
 
-	cfg.Notifier.From = notifier.Address(*notifierFrom)
-	cfg.Notifier.Origin = notifier.Origin(cfg.PublicURL)
-	cfg.Notifier.Endpoint = notifier.Endpoint(*notifierURL)
+	cfg.NotifierFrom = notifier.Address(*notifierFrom)
 	cfg.TrustedProxies = clientip.Parse(*trusted)
 
 	parsed, err := url.Parse(cfg.DatabaseURL)
@@ -158,19 +149,8 @@ func (c *Config) validate() error {
 		return errors.New("oidc client id is empty: set STARTERKIT_OIDC_CLIENT_ID to the audience the gate's token carries")
 	}
 
-	if c.Notifier.From == "" {
+	if c.NotifierFrom == "" {
 		return errors.New("notifier sender is empty: set STARTERKIT_NOTIFIER_FROM")
-	}
-
-	if c.Notifier.Endpoint != "" {
-		endpoint, err := url.Parse(string(c.Notifier.Endpoint))
-		if err != nil || (endpoint.Scheme != "http" && endpoint.Scheme != "https") || endpoint.Host == "" {
-			return errors.New("notifier url must be an absolute http(s) URL: " + string(c.Notifier.Endpoint))
-		}
-	}
-
-	if c.Notifier.Timeout <= 0 {
-		return errors.New("notifier timeout must be positive: set STARTERKIT_NOTIFIER_TIMEOUT")
 	}
 
 	return nil

@@ -132,30 +132,64 @@ A key minted inside the handler would be a new key on every run, which is the
 same as no key. `cmd/server/tx_test.go` redelivers a message and asserts the key
 did not change.
 
-**The key goes to the other side.** With `STARTERKIT_NOTIFIER_URL` set, the
-notifier posts each notice to that relay with an `Idempotency-Key` header, and
-a relay that honours the header answers a repeated key with the original result
-instead of a second notice. A relay that does not honour it needs the key put
-wherever it does dedupe — a message id, a reference field — and if there is no
-such place, the call is not safe to retry and the job must say so. With the URL
-empty the notifier writes the notice and its key to the log, which is how the
-kit runs with nothing configured.
+**The key is handed to the delivery.** The case passes `input.Key` to
+`NotifyUserBanned`, and the kit's notifier writes it to the log beside the
+notice. `internal/case/notifyuserbanned/resolve_test.go` fails the first
+delivery and asserts the retry carried the same key, not a fresh one.
 
-**A timeout is "unknown", not "failed".** A post that timed out may have been
-delivered — the request arrived, the response was lost. So the notifier returns
-an error that says the outcome is unknown, the handler returns it, and goqite
-redelivers the same message after its timeout, carrying the same key. What the
-handler must not do is treat the timeout as a clean failure and create the
-thing again under a new key, or roll back state that says the intent exists.
-`internal/notifier/notifier_test.go` runs a relay that accepts the notice and
-never answers, then retries, and asserts the relay holds one notice, not two.
+**The key goes to the other side.** A real delivery replaces the log line with
+a call, and the call sends the key where the other system dedupes. For an HTTP
+API that accepts one, that is an `Idempotency-Key` header, and a repeated key
+gets the original result instead of a second message:
+
+```go
+func (n *Notifier) post(ctx context.Context, key IdempotencyKey, body []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, string(n.endpoint), bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to build the request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", string(key))
+
+	resp, err := n.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("outcome of %s is unknown, a retry resends the same key: %w", key, err)
+	}
+	defer resp.Body.Close()
+
+	status := strconv.Itoa(resp.StatusCode)
+
+	switch {
+	case resp.StatusCode >= 200 && resp.StatusCode < 300:
+		return nil
+	case resp.StatusCode == http.StatusConflict, resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusTooManyRequests:
+		return errors.New("refused " + string(key) + " with status " + status)
+	default:
+		return errors.New("refused " + string(key) + " with status " + status + ": " + errorBodyLine(resp))
+	}
+}
+```
+
+An API that does not take such a header needs the key put wherever it does
+dedupe — a message id, a reference field — and if there is no such place, the
+call is not safe to retry and the job must say so.
+
+**A timeout is "unknown", not "failed".** A call that timed out may have
+succeeded — the request arrived, the response was lost. So it returns an error
+that says the outcome is unknown, the handler returns it, and goqite redelivers
+the same message after its timeout, carrying the same key. What the handler must
+not do is treat the timeout as a clean failure and create the thing again under
+a new key, or roll back state that says the intent exists. The test for it is a
+stub server that accepts the request, never answers, and dedupes by key: after
+the retry it must hold one record, not two.
 
 **A refusal is an error too, and its body is not logged whole.** A conflict
 (another attempt with the key is still in flight), a not-found or a rate limit
-carries no body; any other refusal carries one line of it, capped — see the rule in
-[rules.md](rules.md).
+carries no body; any other refusal carries one capped line of it — see the rule
+in [rules.md](rules.md).
 
-Goqite's `MaxReceive: 3` bounds the retries. A notice whose relay times out on
+Goqite's `MaxReceive: 3` bounds the retries. A notice whose delivery times out on
 every attempt is dropped after the third, and the job's failure counter in
 `starterkit_jobs_finished_total` is where that shows. A job that must never be
 dropped needs a row that records the outcome, not more retries.

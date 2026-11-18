@@ -27,7 +27,7 @@ var _ notifyuserbanned.Env = &EnvMock{}
 //			DBGetUserByIDFunc: func(ctx context.Context, id int64) (db.User, error) {
 //				panic("mock out the DBGetUserByID method")
 //			},
-//			NotifyUserBannedFunc: func(ctx context.Context, to notifier.Address, reason string) error {
+//			NotifyUserBannedFunc: func(ctx context.Context, key notifier.IdempotencyKey, to notifier.Address, reason string) error {
 //				panic("mock out the NotifyUserBanned method")
 //			},
 //		}
@@ -44,7 +44,7 @@ type EnvMock struct {
 	DBGetUserByIDFunc func(ctx context.Context, id int64) (db.User, error)
 
 	// NotifyUserBannedFunc mocks the NotifyUserBanned method.
-	NotifyUserBannedFunc func(ctx context.Context, to notifier.Address, reason string) error
+	NotifyUserBannedFunc func(ctx context.Context, key notifier.IdempotencyKey, to notifier.Address, reason string) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -66,6 +66,8 @@ type EnvMock struct {
 		NotifyUserBanned []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// Key is the key argument value.
+			Key notifier.IdempotencyKey
 			// To is the to argument value.
 			To notifier.Address
 			// Reason is the reason argument value.
@@ -150,23 +152,25 @@ func (mock *EnvMock) DBGetUserByIDCalls() []struct {
 }
 
 // NotifyUserBanned calls NotifyUserBannedFunc.
-func (mock *EnvMock) NotifyUserBanned(ctx context.Context, to notifier.Address, reason string) error {
+func (mock *EnvMock) NotifyUserBanned(ctx context.Context, key notifier.IdempotencyKey, to notifier.Address, reason string) error {
 	if mock.NotifyUserBannedFunc == nil {
 		panic("EnvMock.NotifyUserBannedFunc: method is nil but Env.NotifyUserBanned was just called")
 	}
 	callInfo := struct {
 		Ctx    context.Context
+		Key    notifier.IdempotencyKey
 		To     notifier.Address
 		Reason string
 	}{
 		Ctx:    ctx,
+		Key:    key,
 		To:     to,
 		Reason: reason,
 	}
 	mock.lockNotifyUserBanned.Lock()
 	mock.calls.NotifyUserBanned = append(mock.calls.NotifyUserBanned, callInfo)
 	mock.lockNotifyUserBanned.Unlock()
-	return mock.NotifyUserBannedFunc(ctx, to, reason)
+	return mock.NotifyUserBannedFunc(ctx, key, to, reason)
 }
 
 // NotifyUserBannedCalls gets all the calls that were made to NotifyUserBanned.
@@ -175,11 +179,13 @@ func (mock *EnvMock) NotifyUserBanned(ctx context.Context, to notifier.Address, 
 //	len(mockedEnv.NotifyUserBannedCalls())
 func (mock *EnvMock) NotifyUserBannedCalls() []struct {
 	Ctx    context.Context
+	Key    notifier.IdempotencyKey
 	To     notifier.Address
 	Reason string
 } {
 	var calls []struct {
 		Ctx    context.Context
+		Key    notifier.IdempotencyKey
 		To     notifier.Address
 		Reason string
 	}

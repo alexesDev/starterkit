@@ -11,6 +11,7 @@ import (
 	"starterkit/internal/case/notifyuserbanned"
 	"starterkit/internal/case/purgeauditlog"
 	"starterkit/internal/jobs"
+	"starterkit/internal/notifier"
 )
 
 const (
@@ -47,7 +48,12 @@ func (a *app) EnqueueJob(ctx context.Context, id string, payload any, priority i
 }
 
 func (a *app) EnqueueUserBannedNotice(ctx context.Context, userID int64) error {
-	return a.EnqueueJob(ctx, jobNotifyUserBanned, notifyuserbanned.Input{UserID: userID}, 0)
+	notice := notifyuserbanned.Input{
+		UserID: userID,
+		Key:    notifier.NewIdempotencyKey(),
+	}
+
+	return a.EnqueueJob(ctx, jobNotifyUserBanned, notice, 0)
 }
 
 // registerJobs is the compile-time proof of wiring: jobs.Register captures a

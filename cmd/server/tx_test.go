@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -11,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"maragu.dev/goqite"
 
+	"starterkit/internal/case/notifyuserbanned"
 	"starterkit/internal/db"
 	"starterkit/internal/dbtime"
 	"starterkit/internal/logger"
@@ -158,6 +162,49 @@ func TestAnEnqueueInsideACommittedTransactionSurvives(t *testing.T) {
 	msg, err := a.queue.Receive(t.Context())
 	require.NoError(t, err, "the enqueue did not commit with its transaction")
 	assert.NotNil(t, msg)
+}
+
+func enqueuedNotice(t *testing.T, msg *goqite.Message) notifyuserbanned.Input {
+	t.Helper()
+
+	var envelope struct {
+		Name    string
+		Message []byte
+	}
+
+	require.NoError(t, gob.NewDecoder(bytes.NewReader(msg.Body)).Decode(&envelope))
+	require.Equal(t, jobNotifyUserBanned, envelope.Name)
+
+	var notice notifyuserbanned.Input
+
+	require.NoError(t, json.Unmarshal(envelope.Message, &notice))
+
+	return notice
+}
+
+func TestARedeliveredNoticeCarriesTheKeyItWasEnqueuedWith(t *testing.T) {
+	a := newTestApp(t)
+
+	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
+		return env.EnqueueUserBannedNotice(ctx, 1)
+	})
+	require.NoError(t, err)
+
+	first, err := a.queue.Receive(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	require.NoError(t, a.queue.Extend(t.Context(), first.ID, 0), "failed to make the message visible again, as a failed run does")
+
+	second, err := a.queue.Receive(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, second, "the message was not redelivered")
+
+	minted := enqueuedNotice(t, first)
+	retried := enqueuedNotice(t, second)
+
+	assert.NotEmpty(t, minted.Key, "the enqueue must mint the key")
+	assert.Equal(t, minted.Key, retried.Key, "a retry must carry the key its first run carried")
 }
 
 func TestAStampRoundTripsThroughSQLite(t *testing.T) {

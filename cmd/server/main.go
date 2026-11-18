@@ -204,7 +204,7 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 
 	a.ready.Store(true)
 	a.Metrics = metrics.New(a, config.Metrics)
-	a.Notifier = notifier.New(a, config.NotifierFrom, notifier.Origin(config.PublicURL))
+	a.Notifier = notifier.New(a, config.Notifier)
 
 	return a, nil
 }

@@ -102,12 +102,63 @@ is the pattern worth copying.
 | Job | What it is |
 |---|---|
 | `purge-audit-log` | Cron enqueues it on `STARTERKIT_AUDIT_PURGE_SPEC` (default 04:00); the job deletes `audit_log` rows older than `STARTERKIT_AUDIT_RETENTION` (default 30 days). Setting the retention to `0` disables the purge. |
-| `notify-user-banned` | Enqueued inside the transaction that writes the ban. The job loads the user and the ban and hands a notice to `internal/notifier`. A user deleted or unbanned between the enqueue and the run is the answer, not a failure. |
+| `notify-user-banned` | Enqueued inside the transaction that writes the ban, with an idempotency key minted by that enqueue. The job loads the user and the ban and hands the notice and the key to `internal/notifier`. A user deleted or unbanned between the enqueue and the run is the answer, not a failure. |
 
-`notify-user-banned` is also where the "safe to run twice" requirement earns its
-keep: the handler is a read plus a delivery, so a redelivery sends the notice
-again rather than corrupting anything. A job that must be exactly-once needs a
-row to say it already happened.
+## A call that creates something elsewhere carries an idempotency key
+
+A handler that only reads and writes this database is safe to run twice by
+being careful. A handler that asks another system to *create* something — send
+a message, open a ticket, charge a card — is not, because the other system
+remembers the first call even when this process does not. The kit's
+`notify-user-banned` job is the worked example, and four things make it safe:
+
+**The key is born with the intent, in the same transaction.** The enqueue mints
+it, and it travels in the job's payload:
+
+```go
+func (a *app) EnqueueUserBannedNotice(ctx context.Context, userID int64) error {
+	notice := notifyuserbanned.Input{
+		UserID: userID,
+		Key:    notifier.NewIdempotencyKey(),
+	}
+
+	return a.EnqueueJob(ctx, jobNotifyUserBanned, notice, 0)
+}
+```
+
+Because the payload is a row in the same SQLite file, the key commits with the
+ban or rolls back with it, and every redelivery of that row reads the same key.
+A key minted inside the handler would be a new key on every run, which is the
+same as no key. `cmd/server/tx_test.go` redelivers a message and asserts the key
+did not change.
+
+**The key goes to the other side.** With `STARTERKIT_NOTIFIER_URL` set, the
+notifier posts each notice to that relay with an `Idempotency-Key` header, and
+a relay that honours the header answers a repeated key with the original result
+instead of a second notice. A relay that does not honour it needs the key put
+wherever it does dedupe — a message id, a reference field — and if there is no
+such place, the call is not safe to retry and the job must say so. With the URL
+empty the notifier writes the notice and its key to the log, which is how the
+kit runs with nothing configured.
+
+**A timeout is "unknown", not "failed".** A post that timed out may have been
+delivered — the request arrived, the response was lost. So the notifier returns
+an error that says the outcome is unknown, the handler returns it, and goqite
+redelivers the same message after its timeout, carrying the same key. What the
+handler must not do is treat the timeout as a clean failure and create the
+thing again under a new key, or roll back state that says the intent exists.
+`internal/notifier/notifier_test.go` runs a relay that accepts the notice and
+never answers, then retries, and asserts the relay holds one notice, not two.
+
+**A refusal is an error too, and its body is not logged whole.** A conflict
+(another attempt with the key is still in flight) or a not-found carries no
+body; any other refusal carries one line of it, capped — see the rule in
+[rules.md](rules.md).
+
+Goqite's `MaxReceive: 3` bounds the retries. A notice whose relay times out on
+every attempt is dropped after the third, and the job's failure counter in
+`starterkit_jobs_finished_total` is where that shows. A job that must never be
+dropped needs a row that records the outcome, not more retries.
 
 ## Shutdown
 

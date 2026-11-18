@@ -18,6 +18,7 @@ func TestResolveTellsTheBannedPersonWhy(t *testing.T) {
 	var (
 		sent   notifier.Address
 		reason string
+		key    notifier.IdempotencyKey
 	)
 
 	env := &EnvMock{
@@ -27,7 +28,8 @@ func TestResolveTellsTheBannedPersonWhy(t *testing.T) {
 		DBGetUserBanFunc: func(_ context.Context, userID int64) (db.UserBan, error) {
 			return db.UserBan{UserID: userID, Reason: "spam"}, nil
 		},
-		NotifyUserBannedFunc: func(_ context.Context, to notifier.Address, why string) error {
+		NotifyUserBannedFunc: func(_ context.Context, carried notifier.IdempotencyKey, to notifier.Address, why string) error {
+			key = carried
 			sent = to
 			reason = why
 
@@ -35,10 +37,13 @@ func TestResolveTellsTheBannedPersonWhy(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, notifyuserbanned.Input{UserID: 2}))
+	input := notifyuserbanned.Input{UserID: 2, Key: "minted-at-enqueue"}
+
+	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, input))
 
 	assert.Equal(t, notifier.Address("user@example.com"), sent)
 	assert.Equal(t, "spam", reason)
+	assert.Equal(t, input.Key, key, "the key minted at the enqueue must reach the delivery, not a fresh one")
 }
 
 func TestResolveIsDoneWhenTheUserIsGone(t *testing.T) {
@@ -74,7 +79,7 @@ func TestResolvePropagatesADeliveryFailureSoTheJobRetries(t *testing.T) {
 		DBGetUserBanFunc: func(_ context.Context, userID int64) (db.UserBan, error) {
 			return db.UserBan{UserID: userID, Reason: "spam"}, nil
 		},
-		NotifyUserBannedFunc: func(context.Context, notifier.Address, string) error {
+		NotifyUserBannedFunc: func(context.Context, notifier.IdempotencyKey, notifier.Address, string) error {
 			return errors.New("smtp is down")
 		},
 	}

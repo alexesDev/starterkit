@@ -212,6 +212,49 @@ none of it before.
 The worked example, the plural helper, the test and the reasons are in
 [texts.md](texts.md).
 
+## An external system's error body is never logged whole
+
+When a call to another system fails, the log line names the status and at most
+one capped line of what came back:
+
+- **An expected status logs no body.** A conflict, a not-found, a rate limit —
+  the status already says everything the reader needs, and the code that
+  expected it decides what happens next.
+- **Any other status logs the body's first line, cut to 200 characters.**
+  Enough to tell a misconfiguration from an outage, not enough to carry a
+  document.
+
+The reason is one sentence: a response body is written by somebody else, and it
+can carry other people's data, a token, or the request echoed back into a log
+that far more people can read than could read the response. A cap does not make
+the line safe, it makes the leak small and the line readable; the expected
+statuses carry no body at all because they are the common case, and the common
+case is where a leak repeats.
+
+`internal/notifier` is the worked example. It reads no more of the body than it
+can use, keeps the first line, and cuts it on a character boundary:
+
+```go
+func errorBodyLine(resp *http.Response) string {
+	head, err := io.ReadAll(io.LimitReader(resp.Body, errorBodyLimit*4))
+	if err != nil && len(head) == 0 {
+		return "unreadable body: " + err.Error()
+	}
+
+	line, _, _ := strings.Cut(string(head), "\n")
+	if len(line) > errorBodyLimit {
+		line = strings.ToValidUTF8(line[:errorBodyLimit], "")
+	}
+
+	return line
+}
+```
+
+The same goes for the error value: `fmt.Errorf("... %s", body)` puts the body in
+every log line that error reaches, so the error carries the status and the
+capped line, never the body. The notifier's error is the only place its line
+appears; the job runner logs that error, once.
+
 ## Go error style
 
 Two lines, never inline:

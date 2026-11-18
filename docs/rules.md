@@ -87,11 +87,10 @@ build on each:
 **A wildcard override is schema-wide, so the schema has to be uniform.** One
 `datetime` column left anywhere and the wildcard claims `Stamp` for a field
 whose column holds text: `Scan` fails, and `Value` would write an integer into a
-text column. Every table is STRICT and every time column is `integer` — no
-exceptions. The only table that is neither is the queue's, vendored verbatim
-from goqite; its timestamps are `text` and named `created`/`updated`/`timeout`,
-outside the `_at`/`_date` convention, so no override matches them and no Go code
-reads them.
+text column. Every table is STRICT, the queue's included, and every time column
+is `integer` except the queue's: its schema comes from goqite, its timestamps are
+`text` and named `created`/`updated`/`timeout`, outside the `_at`/`_date`
+convention, so no override matches them and no Go code reads them.
 
 **The override list is manual and silent when forgotten.** Add `revoked_at`,
 `deleted_at` or `valid_from` without its own entry and sqlc generates `int64`
@@ -451,7 +450,7 @@ invisible above `app`.
    `input: XInput!` argument, returning `XOrErrorPayload!` — then run
    `make gqlgen`.
 3. Implement the resolver as a thin adapter. For a mutation that is one line:
-   `return r.env(ctx).BanUser(ctx, input)`. The choice between payload and
+   `return r.Env.BanUser(ctx, input)`. The choice between payload and
    `ErrorPayload` is the case's, not the resolver's.
 4. Add the command to `graph.Env`, written in the case's own `Input` and
    `Payload` types (one line), and to `cmd/server/commands.go`.

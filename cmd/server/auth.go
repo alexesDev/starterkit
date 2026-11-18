@@ -16,9 +16,6 @@ import (
 	"starterkit/internal/model"
 )
 
-// CurrentAdmin returns the calling admin's user id, or ErrNotAdmin. Admin is
-// not a claim in a token: it came from the database on this request, so
-// revoking it takes effect immediately.
 func (a *app) CurrentAdmin(ctx context.Context) (int64, error) {
 	req, err := appreq.FromCtx(ctx)
 	if err != nil || !req.IsAdmin() {
@@ -51,11 +48,6 @@ func (a *app) CurrentUserID(ctx context.Context) *int64 {
 	return req.UserID()
 }
 
-// WriteAudit only buffers while a request is in scope. Writing immediately
-// would deadlock: the write pool holds exactly one connection and an open
-// mutation transaction is already holding it. The middleware flushes once that
-// transaction is released, outside it, so a denied operation still leaves a
-// trace after its rollback.
 func (a *app) WriteAudit(ctx context.Context, entry audit.Entry) {
 	req, err := appreq.FromCtx(ctx)
 	if err == nil {
@@ -66,9 +58,6 @@ func (a *app) WriteAudit(ctx context.Context, entry audit.Entry) {
 	a.flushAudit(ctx, []audit.Entry{entry})
 }
 
-// flushAudit detaches from the request context: a client that disconnects must
-// not take the record of what it did with it. Failures are logged, never
-// returned.
 func (a *app) flushAudit(ctx context.Context, entries []audit.Entry) {
 	if len(entries) == 0 {
 		return
@@ -108,10 +97,6 @@ func (a *app) SignInByOIDC(ctx context.Context, input signinbyoidc.Input) (*sign
 	return result, err
 }
 
-// resolveIdentity turns the gate's verified token into the whole identity in
-// one indexed lookup: email, admin, and any ban. A nil result means no
-// identity, which is not an error — /healthz and /readyz are served without
-// one, and requireIdentity refuses the rest.
 func (a *app) resolveIdentity(req *appreq.Request, r *http.Request) (*model.AuthIdentity, error) {
 	ctx := r.Context()
 
@@ -163,10 +148,6 @@ func (a *app) resolveIdentity(req *appreq.Request, r *http.Request) (*model.Auth
 	return &model.AuthIdentity{User: user, IsAdmin: identity.IsAdmin != 0}, nil
 }
 
-// recordSignIn notices a sign-in the only way a panel with no session of its
-// own can: the token's iat advancing. oauth2-proxy presents the same ID token
-// for the life of its session, so a later iat is a fresh authentication rather
-// than another request.
 func (a *app) recordSignIn(ctx context.Context, req *appreq.Request, identity db.DBGetIdentityByOIDCRow, issued time.Time) {
 	if issued.IsZero() {
 		return
@@ -201,10 +182,6 @@ func (a *app) recordSignIn(ctx context.Context, req *appreq.Request, identity db
 	a.WriteAudit(ctx, signIn)
 }
 
-// RecordSignOut writes the audit row while the request still has an identity.
-// The session it once cleared belongs to oauth2-proxy now, so the mutation only
-// records the intent and hands back where to go; keeping it is what puts a
-// leaving user in the audit log at all.
 func (a *app) RecordSignOut(ctx context.Context) {
 	req, err := appreq.FromCtx(ctx)
 	if err != nil {

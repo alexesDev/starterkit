@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/makeadmin"
@@ -34,8 +33,8 @@ func TestResolveGrantsAdminAndCountsIt(t *testing.T) {
 	_, ok := result.(*model.MakeAdminPayload)
 	require.True(t, ok, "expected success, got %#v", result)
 
-	assert.Len(t, env.DBInsertAdminCalls(), 1)
-	assert.Len(t, env.MetricsIncreaseAdminChangedCalls(), 1)
+	require.Len(t, env.DBInsertAdminCalls(), 1)
+	require.Len(t, env.MetricsIncreaseAdminChangedCalls(), 1)
 }
 
 func TestResolveRefusesToPromoteABannedUser(t *testing.T) {
@@ -47,8 +46,8 @@ func TestResolveRefusesToPromoteABannedUser(t *testing.T) {
 	refusal, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Equal(t, "user is banned", refusal.Message)
-	assert.Empty(t, env.DBInsertAdminCalls())
+	require.Equal(t, "user is banned", refusal.Message)
+	require.Empty(t, env.DBInsertAdminCalls())
 }
 
 func TestResolveReportsAnUnknownUserAsData(t *testing.T) {
@@ -70,5 +69,5 @@ func TestResolveRefusesANonPositiveUserID(t *testing.T) {
 	_, ok := result.(*model.ErrorPayload)
 	require.True(t, ok, "expected ErrorPayload, got %#v", result)
 
-	assert.Empty(t, env.DBGetAdminUserByIDCalls())
+	require.Empty(t, env.DBGetAdminUserByIDCalls())
 }

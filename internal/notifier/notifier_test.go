@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/logger"
@@ -28,7 +27,7 @@ func TestNotifyUserBannedCountsWhatItDelivered(t *testing.T) {
 	sender := notifier.New(env, "noreply@example.invalid", "https://panel.example")
 
 	require.NoError(t, sender.NotifyUserBanned(t.Context(), "user@example.com", "spam"))
-	assert.Equal(t, []string{string(notifier.KindUserBanned)}, env.kinds)
+	require.Equal(t, []string{string(notifier.KindUserBanned)}, env.kinds)
 }
 
 func TestDeliveryToNobodyIsAFailureRatherThanASilentDrop(t *testing.T) {
@@ -36,5 +35,5 @@ func TestDeliveryToNobodyIsAFailureRatherThanASilentDrop(t *testing.T) {
 	sender := notifier.New(env, "noreply@example.invalid", "https://panel.example")
 
 	require.Error(t, sender.NotifyUserBanned(t.Context(), "", "spam"))
-	assert.Empty(t, env.kinds, "a notice that went nowhere must not be counted as sent")
+	require.Empty(t, env.kinds, "a notice that went nowhere must not be counted as sent")
 }

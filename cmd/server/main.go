@@ -111,8 +111,6 @@ func run() error {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 
-	// ListenAndServe returns the instant Shutdown is called, so returning here
-	// would run the deferred conns.Close() while requests are still in flight.
 	if errors.Is(err, http.ErrServerClosed) {
 		<-drained
 	}
@@ -127,9 +125,6 @@ func metricsHandler(a *app) http.Handler {
 	return mux
 }
 
-// shutdown drains rather than stops. /readyz starts failing immediately so a
-// load balancer deregisters this instance, ShutdownDelay gives it time to
-// notice, and only then do in-flight requests get their window to finish.
 func (a *app) shutdown(srv, metricsSrv *http.Server) {
 	a.ready.Store(false)
 	a.log.Info("shutting down", "delay", a.config.ShutdownDelay, "timeout", a.config.ShutdownTimeout)

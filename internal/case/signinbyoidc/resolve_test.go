@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/signinbyoidc"
@@ -47,11 +46,10 @@ func TestResolveNormalisesTheAddressAndSeedsTheSignInTime(t *testing.T) {
 	_, err := signinbyoidc.Resolve(t.Context(), env, input())
 	require.NoError(t, err)
 
-	assert.Equal(t, "admin@example.com", stored.Email)
+	require.Equal(t, "admin@example.com", stored.Email)
 
-	if assert.NotNil(t, stored.LastSigninAt, "the token's iat must seed last_signin_at") {
-		assert.True(t, input().IssuedAt.Equal(stored.LastSigninAt.Time))
-	}
+	require.NotNil(t, stored.LastSigninAt, "the token's iat must seed last_signin_at")
+	require.True(t, input().IssuedAt.Equal(stored.LastSigninAt.Time))
 }
 
 func TestResolvePromotesTheBootstrapAdminWhileTheTableIsEmpty(t *testing.T) {
@@ -62,8 +60,8 @@ func TestResolvePromotesTheBootstrapAdminWhileTheTableIsEmpty(t *testing.T) {
 	result, err := signinbyoidc.Resolve(t.Context(), env, input())
 	require.NoError(t, err)
 
-	assert.True(t, result.IsAdmin)
-	assert.Len(t, env.DBInsertAdminCalls(), 1)
+	require.True(t, result.IsAdmin)
+	require.Len(t, env.DBInsertAdminCalls(), 1)
 }
 
 func TestResolveNeverPromotesOnceAnAdminExists(t *testing.T) {
@@ -75,8 +73,8 @@ func TestResolveNeverPromotesOnceAnAdminExists(t *testing.T) {
 	result, err := signinbyoidc.Resolve(t.Context(), env, input())
 	require.NoError(t, err)
 
-	assert.False(t, result.IsAdmin)
-	assert.Empty(t, env.DBInsertAdminCalls())
+	require.False(t, result.IsAdmin)
+	require.Empty(t, env.DBInsertAdminCalls())
 }
 
 func TestResolveOnlyPromotesTheConfiguredAddress(t *testing.T) {
@@ -88,8 +86,8 @@ func TestResolveOnlyPromotesTheConfiguredAddress(t *testing.T) {
 	result, err := signinbyoidc.Resolve(t.Context(), env, input())
 	require.NoError(t, err)
 
-	assert.False(t, result.IsAdmin)
-	assert.Empty(t, env.DBCountAdminsCalls(), "a non-matching address must not even count the admins")
+	require.False(t, result.IsAdmin)
+	require.Empty(t, env.DBCountAdminsCalls(), "a non-matching address must not even count the admins")
 }
 
 func TestResolveRefusesAnIdentityWithNoEmail(t *testing.T) {
@@ -127,5 +125,5 @@ func TestResolveLeavesTheSignInTimeUnsetWithoutAnIssuedAt(t *testing.T) {
 	_, err := signinbyoidc.Resolve(t.Context(), env, in)
 	require.NoError(t, err)
 
-	assert.Nil(t, stored.LastSigninAt)
+	require.Nil(t, stored.LastSigninAt)
 }

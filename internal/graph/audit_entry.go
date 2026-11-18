@@ -16,9 +16,6 @@ const (
 	maxActionFields = 8
 )
 
-// adminAction names the admin fields actually selected, so the value in
-// audit_log.action and in the Prometheus label is the schema field rather than
-// whatever the client called its operation.
 func adminAction(ctx context.Context, operation ast.Operation) string {
 	kind := "query"
 	if operation == ast.Mutation {
@@ -33,9 +30,6 @@ func adminAction(ctx context.Context, operation ast.Operation) string {
 	return kind + ":" + strings.Join(fields, ",")
 }
 
-// selectedFieldNames is deduplicated, sorted and capped: aliases let a caller
-// select the same field any number of times, and the result becomes a metric
-// label value, so it must not be attacker-shaped.
 func selectedFieldNames(ctx context.Context) []string {
 	fieldCtx := graphql.GetFieldContext(ctx)
 	if fieldCtx == nil {
@@ -65,9 +59,6 @@ func selectedFieldNames(ctx context.Context) []string {
 	return names
 }
 
-// auditVariables renders the operation's variables as JSON. Nothing in this
-// schema carries a secret; the first field that does must be redacted before it
-// reaches the audit detail. See docs/graphql.md.
 func auditVariables(ctx context.Context) string {
 	opCtx := graphql.GetOperationContext(ctx)
 	if opCtx == nil || opCtx.Operation == nil || len(opCtx.Variables) == 0 {
@@ -82,7 +73,6 @@ func auditVariables(ctx context.Context) string {
 	return truncate(string(encoded))
 }
 
-// truncate cuts on a rune boundary, so the column never receives invalid UTF-8.
 func truncate(s string) string {
 	if len(s) <= maxDetail {
 		return s

@@ -7,13 +7,6 @@ import (
 	ozzo "github.com/go-ozzo/ozzo-validation/v4"
 )
 
-// NewOzzoError turns a validation failure into the payload the UI renders, one
-// message per input field, and returns nil for a nil error so a case can write:
-//
-//	invalid := model.NewOzzoError(validate(&input))
-//	if invalid != nil {
-//		return invalid, nil
-//	}
 func NewOzzoError(err error) *ErrorPayload {
 	if err == nil {
 		return nil

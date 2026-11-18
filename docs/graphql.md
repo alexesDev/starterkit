@@ -10,12 +10,13 @@ A resolver translates and delegates. It contains no logic:
 
 ```go
 func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, limit int64, before *int64) (*model.AuditLogConnection, error) {
-	return r.env(ctx).ListAuditLog(ctx, limit, before)
+	return r.Env.ListAuditLog(ctx, limit, before)
 }
 ```
 
-`r.env(ctx)` pulls the request-scoped env — during a mutation, that is the
-transaction-scoped copy.
+`r.Env` is `app` itself, the same one for every request. A transaction never
+reaches the resolver: the command method opens it and hands the
+transaction-scoped copy to the case through `runInTx`'s closure.
 
 The longest resolver in this kit is twelve lines, and it is twelve only because
 sqlc names a row type per query (`internal/graph/rows.go`). Anything longer,
@@ -97,7 +98,7 @@ The resolver is one line:
 
 ```go
 func (r *adminMutationResolver) BanUser(ctx context.Context, obj *model1.AdminMutation, input model.BanUserInput) (model.BanUserOrErrorPayload, error) {
-	return r.env(ctx).BanUser(ctx, input)
+	return r.Env.BanUser(ctx, input)
 }
 ```
 
@@ -181,9 +182,10 @@ func (a *app) BanUser(ctx context.Context, input banuser.Input) (banuser.Payload
 ```
 
 `runInTx` opens a write transaction, commits when the case returns no error and
-rolls back otherwise. A command that must call a third party before its single
-insert simply omits `runInTx` — one Go line of difference, visible where the
-sequencing happens.
+rolls back otherwise. Every command in the kit wraps its case this way. A
+command that has to call a third party must not hold the single write
+connection while it waits, so it calls out first and wraps only its writes —
+the sequencing stays visible in the command, not hidden in the case.
 
 The boundary sits here rather than on the whole GraphQL operation because a
 mutation that must call out, then write several rows atomically, then call out

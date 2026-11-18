@@ -5,13 +5,13 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTruncateLeavesShortDetailAlone(t *testing.T) {
 	detail := strings.Repeat("a", maxDetail)
 
-	assert.Equal(t, detail, truncate(detail))
+	require.Equal(t, detail, truncate(detail))
 }
 
 func TestTruncateCutsOnARuneBoundary(t *testing.T) {
@@ -19,7 +19,7 @@ func TestTruncateCutsOnARuneBoundary(t *testing.T) {
 
 	got := truncate(oversized)
 
-	assert.True(t, utf8.ValidString(got), "the audit column must never receive invalid UTF-8")
-	assert.True(t, strings.HasSuffix(got, "..."), "a truncated detail must say so")
-	assert.Less(t, len(got), len(oversized))
+	require.True(t, utf8.ValidString(got), "the audit column must never receive invalid UTF-8")
+	require.True(t, strings.HasSuffix(got, "..."), "a truncated detail must say so")
+	require.Less(t, len(got), len(oversized))
 }

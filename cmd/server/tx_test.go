@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"maragu.dev/goqite"
 
@@ -84,7 +83,7 @@ func TestWithTransactionRollsBackWhenTheCallbackFails(t *testing.T) {
 	require.ErrorIs(t, err, errTestRollback)
 
 	_, err = a.Queries.DBGetIdentityByOIDC(t.Context(), identityOf("b"))
-	assert.True(t, db.IsNotFound(err), "the row survived a rollback: %v", err)
+	require.True(t, db.IsNotFound(err), "the row survived a rollback: %v", err)
 }
 
 func TestNestedWithTransactionFails(t *testing.T) {
@@ -92,7 +91,7 @@ func TestNestedWithTransactionFails(t *testing.T) {
 
 	err := a.WithTransaction(t.Context(), func(ctx context.Context, env *app) error {
 		return env.WithTransaction(ctx, func(context.Context, *app) error {
-			assert.Fail(t, "the inner transaction should never run")
+			require.Fail(t, "the inner transaction should never run")
 			return nil
 		})
 	})
@@ -105,7 +104,7 @@ func TestNestedWithTransactionFailsViaTheOuterEnv(t *testing.T) {
 
 	err := a.WithTransaction(t.Context(), func(ctx context.Context, _ *app) error {
 		return a.WithTransaction(ctx, func(context.Context, *app) error {
-			assert.Fail(t, "the inner transaction should never run")
+			require.Fail(t, "the inner transaction should never run")
 			return nil
 		})
 	})
@@ -124,7 +123,7 @@ func TestTheTransactionEnvSeesItsOwnUncommittedWrites(t *testing.T) {
 		require.NoError(t, txErr, "the transaction cannot see its own write")
 
 		_, outsideErr := a.Queries.DBGetIdentityByOIDC(ctx, identityOf("c"))
-		assert.True(t, db.IsNotFound(outsideErr), "an uncommitted write is visible outside the transaction: %v", outsideErr)
+		require.True(t, db.IsNotFound(outsideErr), "an uncommitted write is visible outside the transaction: %v", outsideErr)
 
 		return errTestRollback
 	})
@@ -144,7 +143,7 @@ func TestAnEnqueueInsideATransactionRollsBackWithIt(t *testing.T) {
 
 	msg, err := a.queue.Receive(t.Context())
 	require.NoError(t, err)
-	assert.Nil(t, msg, "the enqueue survived the rollback")
+	require.Nil(t, msg, "the enqueue survived the rollback")
 }
 
 func TestAnEnqueueInsideACommittedTransactionSurvives(t *testing.T) {
@@ -157,7 +156,7 @@ func TestAnEnqueueInsideACommittedTransactionSurvives(t *testing.T) {
 
 	msg, err := a.queue.Receive(t.Context())
 	require.NoError(t, err, "the enqueue did not commit with its transaction")
-	assert.NotNil(t, msg)
+	require.NotNil(t, msg)
 }
 
 func TestAStampRoundTripsThroughSQLite(t *testing.T) {
@@ -174,7 +173,6 @@ func TestAStampRoundTripsThroughSQLite(t *testing.T) {
 	identity, err := a.Queries.DBGetIdentityByOIDC(t.Context(), identityOf("d"))
 	require.NoError(t, err)
 
-	if assert.NotNil(t, identity.LastSigninAt, "an integer time column must read back as a stamp") {
-		assert.True(t, issued.Equal(identity.LastSigninAt.Time), "stored %s, read back %s", issued, identity.LastSigninAt)
-	}
+	require.NotNil(t, identity.LastSigninAt, "an integer time column must read back as a stamp")
+	require.True(t, issued.Equal(identity.LastSigninAt.Time), "stored %s, read back %s", issued, identity.LastSigninAt)
 }

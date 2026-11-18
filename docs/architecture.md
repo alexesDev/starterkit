@@ -39,6 +39,7 @@ type Env interface {
 	DBInsertUserBan(ctx context.Context, arg db.DBInsertUserBanParams) (db.UserBan, error)
 	CurrentUserID(ctx context.Context) *int64
 	EnqueueUserBannedNotice(ctx context.Context, userID int64) error
+	Now() time.Time
 	MetricsIncreaseUserBanned(ctx context.Context)
 }
 
@@ -91,9 +92,9 @@ methods; `db.WriteQueries` has the rest. Code holding a read handle cannot
 write, and the compiler is what says so. See [data-layer.md](data-layer.md).
 
 **A command owns its transaction.** Each mutation is a command method on `app`
-that decides what is atomic: `runInTx` around the case for those that only
-write, and no transaction at all for one that has to call a third party before
-its single insert. Resolvers never see it. See [graphql.md](graphql.md).
+that decides what is atomic: every command in the kit wraps its case in
+`runInTx`, and one that has to call a third party would call out before it
+opens the transaction, never inside it. Resolvers never see it. See [graphql.md](graphql.md).
 
 **The admin boundary is one object.** `Query.admin` and `Mutation.admin`
 resolve a marker struct after checking the caller is an admin, so every field

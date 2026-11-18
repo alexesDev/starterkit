@@ -14,13 +14,10 @@ import (
 
 type Env interface {
 	RegisterJob(id string, handler func(ctx context.Context, body []byte) error)
-	EnqueueJob(ctx context.Context, id string, payload any, priority int) error
 	MetricsIncreaseJobFinished(ctx context.Context, job string, err error)
 }
 
-type EnqueueFunc func(ctx context.Context, payload any) error
-
-func Register[P any](env Env, jobID string, priority int, handler func(context.Context, P) error) EnqueueFunc {
+func Register[P any](env Env, jobID string, handler func(context.Context, P) error) {
 	env.RegisterJob(jobID, func(ctx context.Context, body []byte) error {
 		var params P
 
@@ -38,8 +35,4 @@ func Register[P any](env Env, jobID string, priority int, handler func(context.C
 
 		return nil
 	})
-
-	return func(ctx context.Context, payload any) error {
-		return env.EnqueueJob(ctx, jobID, payload, priority)
-	}
 }

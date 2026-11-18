@@ -21,12 +21,9 @@ import (
 )
 
 type Resolver struct {
-	DefaultEnv Env
+	Env Env
 }
 
-// Env is the aggregate at the edge: one line per case, written in that case's
-// own Input and Payload types, plus the plain reads a case package would only
-// wrap. See docs/env-pattern.md.
 type Env interface {
 	audit.Writer
 
@@ -53,24 +50,8 @@ type Env interface {
 	CurrentUserID(ctx context.Context) *int64
 }
 
-func (r *Resolver) env(ctx context.Context) Env {
-	req, err := appreq.FromCtx(ctx)
-	if err != nil {
-		return r.DefaultEnv
-	}
-
-	reqEnv, ok := req.Env.(Env)
-	if !ok {
-		return r.DefaultEnv
-	}
-
-	return reqEnv
-}
-
-// checkAdmin runs once, when the `admin` namespace object is resolved, so every
-// field underneath it is behind this check by construction.
 func (r *Resolver) checkAdmin(ctx context.Context, operation ast.Operation) error {
-	env := r.env(ctx)
+	env := r.Env
 	entry := audit.Entry{Action: adminAction(ctx, operation)}
 
 	req, err := appreq.FromCtx(ctx)

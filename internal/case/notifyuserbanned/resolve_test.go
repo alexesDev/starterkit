@@ -6,7 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/notifyuserbanned"
@@ -37,8 +36,8 @@ func TestResolveTellsTheBannedPersonWhy(t *testing.T) {
 
 	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, notifyuserbanned.Input{UserID: 2}))
 
-	assert.Equal(t, notifier.Address("user@example.com"), sent)
-	assert.Equal(t, "spam", reason)
+	require.Equal(t, notifier.Address("user@example.com"), sent)
+	require.Equal(t, "spam", reason)
 }
 
 func TestResolveIsDoneWhenTheUserIsGone(t *testing.T) {
@@ -49,7 +48,7 @@ func TestResolveIsDoneWhenTheUserIsGone(t *testing.T) {
 	}
 
 	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, notifyuserbanned.Input{UserID: 2}))
-	assert.Empty(t, env.NotifyUserBannedCalls())
+	require.Empty(t, env.NotifyUserBannedCalls())
 }
 
 func TestResolveIsDoneWhenTheBanWasLiftedBeforeTheJobRan(t *testing.T) {
@@ -63,7 +62,7 @@ func TestResolveIsDoneWhenTheBanWasLiftedBeforeTheJobRan(t *testing.T) {
 	}
 
 	require.NoError(t, notifyuserbanned.Resolve(t.Context(), env, notifyuserbanned.Input{UserID: 2}))
-	assert.Empty(t, env.NotifyUserBannedCalls(), "an unbanned user must not be told they are banned")
+	require.Empty(t, env.NotifyUserBannedCalls(), "an unbanned user must not be told they are banned")
 }
 
 func TestResolvePropagatesADeliveryFailureSoTheJobRetries(t *testing.T) {

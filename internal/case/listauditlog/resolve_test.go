@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/listauditlog"
@@ -38,7 +37,7 @@ func TestResolveAsksForOneRowMoreThanTheLimit(t *testing.T) {
 	_, err := listauditlog.Resolve(t.Context(), env, listauditlog.Input{Limit: 10})
 	require.NoError(t, err)
 
-	assert.Equal(t, int64(11), asked.PageLimit)
+	require.Equal(t, int64(11), asked.PageLimit)
 }
 
 func TestResolveTrimsTheProbeRowAndReportsAnotherPage(t *testing.T) {
@@ -49,12 +48,11 @@ func TestResolveTrimsTheProbeRowAndReportsAnotherPage(t *testing.T) {
 	result, err := listauditlog.Resolve(t.Context(), env, listauditlog.Input{Limit: 3})
 	require.NoError(t, err)
 
-	assert.Len(t, result.Nodes, 3, "the probe row leaked into the page")
-	assert.True(t, result.PageInfo.HasNextPage)
+	require.Len(t, result.Nodes, 3, "the probe row leaked into the page")
+	require.True(t, result.PageInfo.HasNextPage)
 
-	if assert.NotNil(t, result.PageInfo.EndCursor) {
-		assert.Equal(t, result.Nodes[2].ID, *result.PageInfo.EndCursor)
-	}
+	require.NotNil(t, result.PageInfo.EndCursor)
+	require.Equal(t, result.Nodes[2].ID, *result.PageInfo.EndCursor)
 }
 
 func TestResolveReportsNoNextPageWhenTheProbeFoundNothing(t *testing.T) {
@@ -65,8 +63,8 @@ func TestResolveReportsNoNextPageWhenTheProbeFoundNothing(t *testing.T) {
 	result, err := listauditlog.Resolve(t.Context(), env, listauditlog.Input{Limit: 3})
 	require.NoError(t, err)
 
-	assert.Len(t, result.Nodes, 2)
-	assert.False(t, result.PageInfo.HasNextPage)
+	require.Len(t, result.Nodes, 2)
+	require.False(t, result.PageInfo.HasNextPage)
 }
 
 func TestResolveClampsAnOversizedLimit(t *testing.T) {
@@ -77,7 +75,7 @@ func TestResolveClampsAnOversizedLimit(t *testing.T) {
 	_, err := listauditlog.Resolve(t.Context(), env, listauditlog.Input{Limit: 100000})
 	require.NoError(t, err)
 
-	assert.Equal(t, int64(501), asked.PageLimit)
+	require.Equal(t, int64(501), asked.PageLimit)
 }
 
 func TestResolveFallsBackToTheDefaultLimit(t *testing.T) {
@@ -88,7 +86,7 @@ func TestResolveFallsBackToTheDefaultLimit(t *testing.T) {
 	_, err := listauditlog.Resolve(t.Context(), env, listauditlog.Input{Limit: 0})
 	require.NoError(t, err)
 
-	assert.Equal(t, int64(51), asked.PageLimit)
+	require.Equal(t, int64(51), asked.PageLimit)
 }
 
 func TestResolveTreatsAMissingCursorAsTheFirstPage(t *testing.T) {
@@ -99,7 +97,7 @@ func TestResolveTreatsAMissingCursorAsTheFirstPage(t *testing.T) {
 	_, err := listauditlog.Resolve(t.Context(), env, listauditlog.Input{Limit: 10})
 	require.NoError(t, err)
 
-	assert.Equal(t, int64(0), asked.Before)
+	require.Equal(t, int64(0), asked.Before)
 }
 
 func TestResolveLeavesTheCursorUnsetOnAnEmptyPage(t *testing.T) {
@@ -110,6 +108,6 @@ func TestResolveLeavesTheCursorUnsetOnAnEmptyPage(t *testing.T) {
 	result, err := listauditlog.Resolve(t.Context(), env, listauditlog.Input{Limit: 10})
 	require.NoError(t, err)
 
-	assert.Nil(t, result.PageInfo.EndCursor)
-	assert.Equal(t, int64(120), result.TotalCount)
+	require.Nil(t, result.PageInfo.EndCursor)
+	require.Equal(t, int64(120), result.TotalCount)
 }

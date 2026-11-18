@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/metrics"
@@ -35,8 +34,8 @@ func TestUpdatePublishesOneSeriesPerTable(t *testing.T) {
 	require.NoError(t, m.Update(t.Context()))
 
 	body := scrape(t, m)
-	assert.Contains(t, body, `starterkit_table_rows{table="users"} 2`)
-	assert.Contains(t, body, `starterkit_table_rows{table="audit_log"} 6`)
+	require.Contains(t, body, `starterkit_table_rows{table="users"} 2`)
+	require.Contains(t, body, `starterkit_table_rows{table="audit_log"} 6`)
 }
 
 func TestUpdateStopsReportingATableThatIsGone(t *testing.T) {
@@ -55,7 +54,7 @@ func TestUpdateStopsReportingATableThatIsGone(t *testing.T) {
 	require.NoError(t, m.Update(t.Context()))
 
 	body := scrape(t, m)
-	assert.NotContains(t, body, `table="widgets"`, "a dropped table froze at its last value")
+	require.NotContains(t, body, `table="widgets"`, "a dropped table froze at its last value")
 }
 
 func TestUpdateSurfacesAFailedRead(t *testing.T) {
@@ -80,5 +79,5 @@ func TestACounterIsPublishedOnceItMoves(t *testing.T) {
 	m.MetricsIncreaseNotification(t.Context(), "user_banned")
 
 	body := scrape(t, m)
-	assert.Contains(t, body, `starterkit_notifications_total{kind="user_banned"} 1`)
+	require.Contains(t, body, `starterkit_notifications_total{kind="user_banned"} 1`)
 }

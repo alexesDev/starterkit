@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"starterkit/internal/case/purgeauditlog"
@@ -29,7 +28,7 @@ func TestResolveDeletesEverythingOlderThanTheRetention(t *testing.T) {
 	}
 
 	require.NoError(t, purgeauditlog.Resolve(t.Context(), env))
-	assert.True(t, now().Add(-30*24*time.Hour).Equal(cutoff.Time))
+	require.True(t, now().Add(-30*24*time.Hour).Equal(cutoff.Time))
 }
 
 func TestResolveDoesNothingWhenRetentionIsDisabled(t *testing.T) {
@@ -39,7 +38,7 @@ func TestResolveDoesNothingWhenRetentionIsDisabled(t *testing.T) {
 	}
 
 	require.NoError(t, purgeauditlog.Resolve(t.Context(), env))
-	assert.Empty(t, env.DBDeleteAuditLogBeforeCalls(), "retention 0 must not delete anything")
+	require.Empty(t, env.DBDeleteAuditLogBeforeCalls(), "retention 0 must not delete anything")
 }
 
 func TestResolveDoesNothingWhenRetentionIsNegative(t *testing.T) {
@@ -49,5 +48,5 @@ func TestResolveDoesNothingWhenRetentionIsNegative(t *testing.T) {
 	}
 
 	require.NoError(t, purgeauditlog.Resolve(t.Context(), env))
-	assert.Empty(t, env.DBDeleteAuditLogBeforeCalls())
+	require.Empty(t, env.DBDeleteAuditLogBeforeCalls())
 }

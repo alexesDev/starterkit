@@ -65,7 +65,7 @@ func (a *app) Now() time.Time {
 }
 
 func (a *app) AuditRetention() time.Duration {
-	return a.config.AuditRetention
+	return a.config.Audit.Retention
 }
 
 func (a *app) BootstrapAdminEmail() string {

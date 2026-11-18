@@ -166,7 +166,7 @@ want gone first, in that order:
    design; the kit is under the token threshold with five commands and a project
    with thirty will not be.
 4. **`funlen` / `cyclop` / `gocognit`** — composition roots are the pressure
-   point. `appconfig.Get` is already 60 lines and `run` is 86, both well inside
+   point. `appconfig.Parse` registers every service in one place and `run` is 86 lines, both well inside
    the limits but both the kind of function that only grows.
 5. **`depguard`** — its denylist is this project's, not yours.
 

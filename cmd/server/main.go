@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -35,11 +36,15 @@ func main() {
 
 func run() error {
 	config, err := appconfig.Get()
+	if errors.Is(err, flag.ErrHelp) {
+		return nil
+	}
+
 	if err != nil {
 		return err
 	}
 
-	log := logger.New(config.LogLevel, config.DevMode)
+	log := logger.New(config.Log, config.DevMode)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -127,13 +132,13 @@ func metricsHandler(a *app) http.Handler {
 
 func (a *app) shutdown(srv, metricsSrv *http.Server) {
 	a.ready.Store(false)
-	a.log.Info("shutting down", "delay", a.config.ShutdownDelay, "timeout", a.config.ShutdownTimeout)
+	a.log.Info("shutting down", "delay", a.config.Shutdown.Delay, "timeout", a.config.Shutdown.Timeout)
 
-	if a.config.ShutdownDelay > 0 {
-		time.Sleep(a.config.ShutdownDelay)
+	if a.config.Shutdown.Delay > 0 {
+		time.Sleep(a.config.Shutdown.Delay)
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), a.config.ShutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), a.config.Shutdown.Timeout)
 	defer cancel()
 
 	err := srv.Shutdown(shutdownCtx)
@@ -153,12 +158,7 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 		return nil, err
 	}
 
-	gateConfig := gateauth.Config{
-		Issuer:   config.OIDCIssuer,
-		Audience: config.OIDCClientID,
-	}
-
-	gate, err := gateauth.New(ctx, gateConfig)
+	gate, err := gateauth.New(ctx, config.Gate)
 	if err != nil {
 		conns.Close()
 		return nil, err
@@ -199,7 +199,7 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 
 	a.ready.Store(true)
 	a.Metrics = metrics.New(a, config.Metrics)
-	a.Notifier = notifier.New(a, config.NotifierFrom, notifier.Origin(config.PublicURL))
+	a.Notifier = notifier.New(a, config.Notifier, notifier.Origin(config.PublicURL))
 
 	return a, nil
 }

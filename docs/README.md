@@ -7,6 +7,7 @@ Why things are the way they are. Start here, in this order.
 | [architecture.md](architecture.md) | The shape of the system, and a table of where each kind of change goes. **Read this first.** |
 | [rules.md](rules.md) | The house rules. Not style preferences — each one cost somebody a day. |
 | [env-pattern.md](env-pattern.md) | The architecture the whole kit rests on, how a service object plugs into it, and the mistakes it is prone to |
+| [config.md](config.md) | Settings: who declares them, flags and `STARTERKIT_*`, every problem at once |
 | [data-layer.md](data-layer.md) | SQLite, sqlc, dbmate, the read/write split, timestamps, pagination |
 | [graphql.md](graphql.md) | Schema conventions, the admin namespace, transactional mutations |
 | [frontend-mol.md](frontend-mol.md) | The $mol SPA, the codegen bridge, the build |

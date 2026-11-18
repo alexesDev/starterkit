@@ -5,7 +5,12 @@
 // attempt has to survive that. See docs/auth-dex.md.
 package audit
 
-import "context"
+import (
+	"context"
+	"time"
+
+	"starterkit/internal/confread"
+)
 
 const (
 	ActionSignIn  = "sign_in"
@@ -26,4 +31,27 @@ type Entry struct {
 
 type Writer interface {
 	WriteAudit(ctx context.Context, entry Entry)
+}
+
+type Config struct {
+	Retention time.Duration
+	PurgeSpec string
+}
+
+func DefaultConfig() Config {
+	return Config{
+		Retention: 30 * 24 * time.Hour,
+		PurgeSpec: "0 4 * * *",
+	}
+}
+
+func (c *Config) Register(r *confread.Reader) {
+	*c = DefaultConfig()
+
+	r.Duration(&c.Retention, "audit-retention", 0, "how long audit_log rows are kept; 0 disables the purge")
+	r.String(&c.PurgeSpec, "audit-purge-spec", "cron spec for the audit retention sweep")
+}
+
+func (c *Config) Check(r *confread.Reader) {
+	r.Require("audit-purge-spec", c.PurgeSpec != "", "is empty")
 }

@@ -130,7 +130,8 @@ The server also migrates itself on boot from the embedded `db/migrations`
 ## One DATABASE_URL, two consumers
 
 `.env` carries a single `DATABASE_URL=sqlite:data.sqlite3`. dbmate reads it, and
-so does `internal/appconfig` — deliberately the same setting, so `make db-up`
+so does `internal/appconfig`, through `r.Key` rather than a prefixed name
+([config.md](config.md)) — deliberately the same setting, so `make db-up`
 and the server's migrate-on-boot cannot end up pointing at different files.
 
 ## cgo, and where it is allowed

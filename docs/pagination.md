@@ -25,7 +25,7 @@ type AuditLogConnection {
 }
 
 type AdminQuery {
-  auditLog(first: Int64 = 50, after: Cursor): AuditLogConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
 }
 ```
 
@@ -40,8 +40,9 @@ type AdminQuery {
   never reads. Today it carries the last row's id; a list that one day sorts by
   another column carries `(column, id)` in the same string, and no client
   changes. Only the server encodes and decodes it.
-- **`first` is clamped** to a default and a maximum from configuration. A
-  request for more gets the maximum, not an error.
+- **`first` is optional and clamped.** Left out, it takes the configured
+  default; the schema carries no default of its own, so there is one. A request
+  for more than the configured maximum gets the maximum, not an error.
 - **`totalCount` is computed only when asked.** It is a forced resolver, so
   `count(*)` runs for the page that shows a total and not for the one that
   only scrolls.

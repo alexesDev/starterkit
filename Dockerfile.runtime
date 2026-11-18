@@ -1,4 +1,4 @@
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static:nonroot
 
 ARG GIT_COMMIT=unknown
 LABEL org.opencontainers.image.revision=${GIT_COMMIT}

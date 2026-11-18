@@ -52,10 +52,10 @@ type SignOutPayload {
 }
 
 type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
-  users(first: Int64 = 50, after: Cursor): UsersConnection!
+  users(first: Int64, after: Cursor): UsersConnection!
   user(id: Int64!): AdminUser
-  admins(first: Int64 = 50, after: Cursor): AdminsConnection!
-  auditLog(first: Int64 = 50, after: Cursor): AuditLogConnection!
+  admins(first: Int64, after: Cursor): AdminsConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
   build: Build!
 }
 

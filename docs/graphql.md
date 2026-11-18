@@ -137,10 +137,10 @@ type Query {
 }
 
 type AdminQuery {
-  users(first: Int64 = 50, after: Cursor): UsersConnection!
+  users(first: Int64, after: Cursor): UsersConnection!
   user(id: Int64!): AdminUser
-  admins(first: Int64 = 50, after: Cursor): AdminsConnection!
-  auditLog(first: Int64 = 50, after: Cursor): AuditLogConnection!
+  admins(first: Int64, after: Cursor): AdminsConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
   build: Build!
 }
 ```
@@ -233,7 +233,7 @@ type AuditLogConnection {
 }
 
 type AdminQuery {
-  auditLog(first: Int64 = 50, after: Cursor): AuditLogConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
 }
 ```
 
@@ -252,11 +252,12 @@ harmless and quietly undoes that: a client that only scrolls would pay for the
 count on every page. `internal/graph/handler_test.go` pins it.
 
 `internal/page` owns the mechanics, and a list case states nothing about
-paging itself: `Limits.Window` clamps `first` to the configured default and
-maximum (`STARTERKIT_PAGE_DEFAULT`, `STARTERKIT_PAGE_MAX`; asking for more gets
-the maximum, not an error) and turns `after` into the id the query starts
-below; `Cut` takes the rows and a function naming a row's id, drops the probe
-row and fills `pageInfo`.
+paging itself: `Limits.Window` gives an absent `first` the configured default
+(`STARTERKIT_PAGE_DEFAULT`), clamps it to the configured maximum
+(`STARTERKIT_PAGE_MAX`; asking for more gets the maximum, not an error), and
+turns `after` into the id the query starts below. The schema declares no
+default of its own, so there is one number to change. `Cut` takes the rows and
+a function naming a row's id, drops the probe row and fills `pageInfo`.
 
 `Cursor` is opaque: the client hands back an `endCursor` and never reads it.
 Today it is the last row's id in base64; a list that one day sorts by another

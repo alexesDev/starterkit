@@ -397,7 +397,7 @@ type UsersConnection {
 }
 
 type AdminQuery {
-  users(first: Int64 = 50, after: Cursor): UsersConnection!
+  users(first: Int64, after: Cursor): UsersConnection!
 }
 ```
 

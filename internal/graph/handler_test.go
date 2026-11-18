@@ -117,3 +117,14 @@ func TestAuditLogRefusesACursorItDidNotIssue(t *testing.T) {
 	require.Equal(t, page.ErrInvalidCursor.Error(), got.Errors[0].Message)
 	require.Empty(t, env.ListAuditLogCalls(), "a list ran on a cursor that does not decode")
 }
+
+func TestAuditLogLeavesAnAbsentFirstToTheConfiguredDefault(t *testing.T) {
+	env := adminEnv()
+
+	got := query(t, env, `{ admin { auditLog { nodes { id } } } }`)
+	require.Empty(t, got.Errors)
+
+	calls := env.ListAuditLogCalls()
+	require.Len(t, calls, 1)
+	assert.Nil(t, calls[0].Input.First, "the schema supplied a default of its own")
+}

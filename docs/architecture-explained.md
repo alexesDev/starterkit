@@ -160,7 +160,9 @@ Parser and validator errors and `ErrNotAdmin` pass through unchanged.
 `WriteAudit` only appends to the request (`cmd/server/auth.go`, `app.WriteAudit`). After the handler
 returns, `withRequest` flushes the buffer through the base write handle, outside
 any transaction and detached from the request's cancellation (`cmd/server/http.go`, `app.withRequest`; `cmd/server/auth.go`, `app.flushAudit`). So the record of a denied or rolled-back operation survives, and
-a client that disconnects cannot take its audit row with it.
+a client that disconnects cannot take its audit row with it. A job has no
+request, so `WithTransaction` carries the same buffer itself and flushes it
+after its commit or rollback (`cmd/server/tx.go`, `app.WithTransaction`).
 
 ## The job path
 
@@ -346,8 +348,10 @@ There is no second system to deploy, monitor or back up.
 **Cost:** the queue shares the single writer with the application. It is not a
 broker: no fan-out, no consumer groups, no cross-process delivery beyond what
 one SQLite file allows. goqite panics on a message whose job name nothing
-registered, outside its own recover, and that ends the process; so a job is
-retired by draining its messages first, not by deleting its registration.
+registered, outside its own recover, and that would end the process; so before
+the runner starts, `deadletterjobs` (`internal/case/deadletterjobs/resolve.go`, `Resolve`) moves such messages to the `jobs-dead`
+queue, logs each at Warn and counts them in `starterkit_jobs_dead`. A job is
+still best retired by draining its messages first.
 
 ### Cron as an enqueuer
 
@@ -364,7 +368,9 @@ they cannot drift. `/metrics` has its own loopback listener
 (`cmd/server/main.go`, `run` and `metricsHandler`), so the scraper does not need to pass the gate.
 
 On SIGINT or SIGTERM the process context is cancelled (`cmd/server/main.go`, `run`), which
-stops the job runner and the gauge loop. The shutdown goroutine
+stops the gauge loop and cron's enqueues. The job runner has its own context,
+cancelled only after the HTTP drain, and `run` waits for it before closing the
+database (`cmd/server/main.go`, `app.startJobRunner`). The shutdown goroutine
 (`cmd/server/main.go`, `run` and `app.shutdown`) then marks `/readyz` as failing, sleeps
 `ShutdownDelay` so a load balancer can deregister the instance, and gives
 in-flight requests `ShutdownTimeout` to finish. `run` waits for that goroutine

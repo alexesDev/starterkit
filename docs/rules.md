@@ -220,7 +220,7 @@ one capped line of what came back:
 - **An expected status logs no body.** A conflict, a not-found, a rate limit —
   the status already says everything the reader needs, and the code that
   expected it decides what happens next.
-- **Any other status logs the body's first line, cut to 200 characters.**
+- **Any other status logs the body's first line, cut to 200 bytes.**
   Enough to tell a misconfiguration from an outage, not enough to carry a
   document.
 
@@ -242,6 +242,8 @@ func errorBodyLine(resp *http.Response) string {
 	}
 
 	line, _, _ := strings.Cut(string(head), "\n")
+	line = strings.TrimSuffix(line, "\r")
+
 	if len(line) > errorBodyLimit {
 		line = strings.ToValidUTF8(line[:errorBodyLimit], "")
 	}

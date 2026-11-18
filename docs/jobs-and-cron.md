@@ -151,8 +151,8 @@ thing again under a new key, or roll back state that says the intent exists.
 never answers, then retries, and asserts the relay holds one notice, not two.
 
 **A refusal is an error too, and its body is not logged whole.** A conflict
-(another attempt with the key is still in flight) or a not-found carries no
-body; any other refusal carries one line of it, capped — see the rule in
+(another attempt with the key is still in flight), a not-found or a rate limit
+carries no body; any other refusal carries one line of it, capped — see the rule in
 [rules.md](rules.md).
 
 Goqite's `MaxReceive: 3` bounds the retries. A notice whose relay times out on

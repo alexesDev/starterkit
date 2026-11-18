@@ -140,11 +140,12 @@ func (n *Notifier) post(ctx context.Context, key IdempotencyKey, message notice)
 
 	status := strconv.Itoa(resp.StatusCode)
 
-	if resp.StatusCode == http.StatusConflict || resp.StatusCode == http.StatusNotFound {
+	switch resp.StatusCode {
+	case http.StatusConflict, http.StatusNotFound, http.StatusTooManyRequests:
 		return errors.New("the relay refused " + string(message.Kind) + " " + string(key) + " with status " + status)
+	default:
+		return errors.New("the relay refused " + string(message.Kind) + " " + string(key) + " with status " + status + ": " + errorBodyLine(resp))
 	}
-
-	return errors.New("the relay refused " + string(message.Kind) + " " + string(key) + " with status " + status + ": " + errorBodyLine(resp))
 }
 
 func errorBodyLine(resp *http.Response) string {
@@ -154,6 +155,8 @@ func errorBodyLine(resp *http.Response) string {
 	}
 
 	line, _, _ := strings.Cut(string(head), "\n")
+	line = strings.TrimSuffix(line, "\r")
+
 	if len(line) > errorBodyLimit {
 		line = strings.ToValidUTF8(line[:errorBodyLimit], "")
 	}

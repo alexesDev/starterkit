@@ -145,16 +145,19 @@ func requireService(t *testing.T, envVar, start string) string {
 		absent(t, envVar + "=" + addr + " does not answer (" + err.Error() + "); " + start)
 	}
 
-	conn.Close()
+	_ = conn.Close()
 
 	return addr
 }
 ```
 
 ```go
-func TestDumpMatchesTheSchema(t *testing.T) {
+func TestTheDumpReadsBackTheSchema(t *testing.T) {
 	sqlite3 := requireBinary(t, "sqlite3", "install the sqlite3 package of your distribution")
-	// ...
+
+	out, err := exec.Command(sqlite3, ":memory:", "create table t (id integer) strict;", ".schema").Output()
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "strict")
 }
 ```
 
@@ -168,8 +171,8 @@ the skip honest:
   testing the dependency.
 - **The machine that is supposed to have the dependency fails instead of
   skipping.** A CI job that installs it sets `REQUIRE_INTEGRATION=1`, and
-  `absent` turns the skip into `t.Fatal`. Otherwise a broken install turns the whole integration suite
-  into a column of quiet skips, and the job stays green.
+  `absent` turns the skip into `t.Fatal`. Otherwise a broken install turns the
+  whole integration suite into a column of quiet skips, and the job stays green.
 
 ## The order of the run is a dependency chain
 

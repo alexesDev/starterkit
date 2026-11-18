@@ -108,7 +108,7 @@ deferred `conns.Close()` fires immediately and the database is pulled out from
 under requests that are still running — the timeout would be configured and
 never honoured.
 
-Both durations live in `internal/appconfig`:
+Both durations live in `appconfig.Shutdown` ([config.md](config.md)):
 
 | Setting | Default | Meaning |
 |---|---|---|

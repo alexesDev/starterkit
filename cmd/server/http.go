@@ -97,7 +97,7 @@ func limitBody(next http.Handler) http.Handler {
 
 func (a *app) withRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req := appreq.New(clientip.Resolve(r, a.config.TrustedProxies))
+		req := appreq.New(clientip.Resolve(r, a.config.Proxies.Trusted))
 		ctx := req.NewContext(r.Context())
 		r = r.WithContext(ctx)
 

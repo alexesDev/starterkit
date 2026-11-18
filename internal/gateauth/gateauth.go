@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+
+	"starterkit/internal/confread"
 )
 
 var (
@@ -25,6 +27,25 @@ var (
 type Config struct {
 	Issuer   string
 	Audience string
+}
+
+func DefaultConfig() Config {
+	return Config{
+		Issuer:   "http://dex.sk.localbox/dex",
+		Audience: "starterkit",
+	}
+}
+
+func (c *Config) Register(r *confread.Reader) {
+	*c = DefaultConfig()
+
+	r.String(&c.Issuer, "oidc-issuer", "OIDC issuer URL")
+	r.String(&c.Audience, "oidc-client-id", "audience the gate's ID token must carry")
+}
+
+func (c *Config) Check(r *confread.Reader) {
+	r.Require("oidc-issuer", c.Issuer != "", "is empty")
+	r.Require("oidc-client-id", c.Audience != "", "is empty: set it to the audience the gate's token carries")
 }
 
 type Client struct {

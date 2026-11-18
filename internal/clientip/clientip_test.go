@@ -12,7 +12,9 @@ import (
 )
 
 func localhost() []netip.Prefix {
-	return clientip.Parse("127.0.0.1/32,::1/128")
+	trusted, _ := clientip.Parse("127.0.0.1/32,::1/128")
+
+	return trusted
 }
 
 func request(remote string, forwarded ...string) *http.Request {
@@ -47,7 +49,8 @@ func TestTheRightmostUntrustedHopWins(t *testing.T) {
 }
 
 func TestTrustedHopsAreSkipped(t *testing.T) {
-	trusted := clientip.Parse("127.0.0.1/32,10.0.0.0/8")
+	trusted, err := clientip.Parse("127.0.0.1/32,10.0.0.0/8")
+	require.NoError(t, err)
 
 	got := clientip.Resolve(request("127.0.0.1:5555", "198.51.100.7, 10.0.0.5"), trusted)
 	require.Equal(t, "198.51.100.7", got)
@@ -68,7 +71,13 @@ func TestNoTrustedProxiesMeansTheHeaderIsNeverUsed(t *testing.T) {
 	require.Equal(t, "127.0.0.1", got)
 }
 
-func TestParseSkipsMalformedEntries(t *testing.T) {
-	got := clientip.Parse("127.0.0.1/32, nonsense, 10.0.0.0/8")
+func TestParseRefusesAMalformedEntryByPosition(t *testing.T) {
+	_, err := clientip.Parse("127.0.0.1/32, nonsense, 10.0.0.0/8")
+	require.EqualError(t, err, "entry 2 is not a CIDR such as 10.0.0.0/8")
+}
+
+func TestParseSkipsEmptyEntries(t *testing.T) {
+	got, err := clientip.Parse("127.0.0.1/32,, 10.0.0.0/8 ")
+	require.NoError(t, err)
 	require.Len(t, got, 2)
 }

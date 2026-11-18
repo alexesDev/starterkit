@@ -13,6 +13,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"starterkit/internal/confread"
 )
 
 type Config struct {
@@ -29,6 +31,17 @@ func DefaultConfig() Config {
 		Namespace:      "starterkit",
 		UpdateInterval: 30 * time.Second,
 	}
+}
+
+func (c *Config) Register(r *confread.Reader) {
+	*c = DefaultConfig()
+
+	r.String(&c.Addr, "metrics-addr", "listener for the Prometheus endpoint")
+	r.Duration(&c.UpdateInterval, "metrics-interval", time.Second, "how often gauges are refreshed")
+}
+
+func (c *Config) Check(r *confread.Reader) {
+	r.Require("metrics-addr", c.Addr != "", "is empty")
 }
 
 //go:generate go tool github.com/matryer/moq -out mocks_test.go -pkg metrics_test . Env

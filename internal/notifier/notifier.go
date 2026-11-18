@@ -14,6 +14,7 @@ import (
 	"crypto/rand"
 	"errors"
 
+	"starterkit/internal/confread"
 	"starterkit/internal/logger"
 )
 
@@ -27,6 +28,30 @@ type IdempotencyKey string
 
 const KindUserBanned Kind = "user_banned"
 
+type Config struct {
+	From Address
+}
+
+func DefaultConfig() Config {
+	return Config{From: "noreply@example.invalid"}
+}
+
+func (c *Config) Register(r *confread.Reader) {
+	*c = DefaultConfig()
+
+	setFrom := func(raw string) error {
+		c.From = Address(raw)
+
+		return nil
+	}
+
+	r.Func("notifier-from", string(c.From), "sender address every notice is delivered from", setFrom)
+}
+
+func (c *Config) Check(r *confread.Reader) {
+	r.Require("notifier-from", c.From != "", "is empty")
+}
+
 type Env interface {
 	Logger() logger.Logger
 	MetricsIncreaseNotification(ctx context.Context, kind string)
@@ -38,8 +63,8 @@ type Notifier struct {
 	origin Origin
 }
 
-func New(env Env, from Address, origin Origin) *Notifier {
-	return &Notifier{env: env, from: from, origin: origin}
+func New(env Env, config Config, origin Origin) *Notifier {
+	return &Notifier{env: env, from: config.From, origin: origin}
 }
 
 func NewIdempotencyKey() IdempotencyKey {

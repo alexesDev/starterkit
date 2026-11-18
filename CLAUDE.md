@@ -15,6 +15,7 @@ table of where each kind of change goes. Then, as needed:
 | Doc | When |
 |---|---|
 | [docs/env-pattern.md](docs/env-pattern.md) | Before adding a use case, adding a service, or touching `app` |
+| [docs/config.md](docs/config.md) | Before adding or renaming a setting, or touching `appconfig` |
 | [docs/data-layer.md](docs/data-layer.md) | Before writing SQL, a migration, or touching connections |
 | [docs/graphql.md](docs/graphql.md) | Before editing the schema or a resolver |
 | [docs/texts.md](docs/texts.md) | Before writing a sentence a person reads, or adding a language |

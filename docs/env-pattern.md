@@ -109,8 +109,11 @@ and `newApp` constructs it against `a` itself, after `a` exists:
 
 ```go
 a.Metrics = metrics.New(a, config.Metrics)
-a.Notifier = notifier.New(a, config.NotifierFrom, notifier.Origin(config.PublicURL))
+a.Notifier = notifier.New(a, config.Notifier, notifier.Origin(config.PublicURL))
 ```
+
+`config.Notifier` is the service's own `notifier.Config`: the package declares
+its settings and defaults and registers them itself ([config.md](config.md)).
 
 A case that wants to send a notice names the promoted method on its own `Env`
 and nothing more:

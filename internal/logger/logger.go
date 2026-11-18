@@ -2,9 +2,31 @@
 package logger
 
 import (
+	"errors"
 	"log/slog"
 	"os"
+
+	"starterkit/internal/confread"
 )
+
+type Config struct {
+	Level slog.Level
+}
+
+func (c *Config) Register(r *confread.Reader) {
+	*c = Config{Level: slog.LevelInfo}
+
+	setLevel := func(raw string) error {
+		err := c.Level.UnmarshalText([]byte(raw))
+		if err != nil {
+			return errors.New("must be debug, info, warn or error")
+		}
+
+		return nil
+	}
+
+	r.Func("log-level", "info", "debug|info|warn|error", setLevel)
+}
 
 type Logger interface {
 	Debug(msg string, args ...any)
@@ -18,8 +40,8 @@ type slogLogger struct {
 	log *slog.Logger
 }
 
-func New(level string, pretty bool) Logger {
-	opts := &slog.HandlerOptions{Level: parseLevel(level)}
+func New(config Config, pretty bool) Logger {
+	opts := &slog.HandlerOptions{Level: config.Level}
 
 	var handler slog.Handler
 	if pretty {
@@ -29,19 +51,6 @@ func New(level string, pretty bool) Logger {
 	}
 
 	return &slogLogger{log: slog.New(handler)}
-}
-
-func parseLevel(level string) slog.Level {
-	switch level {
-	case "debug":
-		return slog.LevelDebug
-	case "warn":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
 }
 
 func (l *slogLogger) Debug(msg string, args ...any) {

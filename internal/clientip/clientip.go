@@ -6,16 +6,43 @@
 package clientip
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"strings"
+
+	"starterkit/internal/confread"
 )
 
-func Parse(list string) []netip.Prefix {
+const defaultTrusted = "127.0.0.1/32,::1/128"
+
+type Config struct {
+	Trusted []netip.Prefix
+}
+
+func (c *Config) Register(r *confread.Reader) {
+	c.Trusted, _ = Parse(defaultTrusted)
+
+	setTrusted := func(raw string) error {
+		trusted, err := Parse(raw)
+		if err != nil {
+			return err
+		}
+
+		c.Trusted = trusted
+
+		return nil
+	}
+
+	r.Func("trusted-proxies", defaultTrusted, "CIDRs whose X-Forwarded-For is believed; empty means never believe it", setTrusted)
+}
+
+func Parse(list string) ([]netip.Prefix, error) {
 	var out []netip.Prefix
 
-	for _, item := range strings.Split(list, ",") {
+	for i, item := range strings.Split(list, ",") {
 		item = strings.TrimSpace(item)
 		if item == "" {
 			continue
@@ -23,13 +50,13 @@ func Parse(list string) []netip.Prefix {
 
 		prefix, err := netip.ParsePrefix(item)
 		if err != nil {
-			continue
+			return nil, errors.New("entry " + strconv.Itoa(i+1) + " is not a CIDR such as 10.0.0.0/8")
 		}
 
 		out = append(out, prefix)
 	}
 
-	return out
+	return out, nil
 }
 
 func Resolve(r *http.Request, trusted []netip.Prefix) string {

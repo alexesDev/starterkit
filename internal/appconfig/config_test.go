@@ -18,6 +18,7 @@ func TestTheDefaultsStartAPanel(t *testing.T) {
 	require.Equal(t, 15*time.Second, cfg.Shutdown.Timeout)
 	require.Len(t, cfg.Proxies.Trusted, 2)
 	require.Equal(t, "backups", cfg.Backup.Dir)
+	require.Equal(t, "http://panel.sk.localbox", string(cfg.Notifier.Origin), "a notice names the public origin")
 }
 
 func TestBackupsLandBesideTheDatabaseUnlessADirIsNamed(t *testing.T) {

@@ -29,7 +29,8 @@ type IdempotencyKey string
 const KindUserBanned Kind = "user_banned"
 
 type Config struct {
-	From Address
+	From   Address
+	Origin Origin
 }
 
 func DefaultConfig() Config {
@@ -59,12 +60,11 @@ type Env interface {
 
 type Notifier struct {
 	env    Env
-	from   Address
-	origin Origin
+	config Config
 }
 
-func New(env Env, config Config, origin Origin) *Notifier {
-	return &Notifier{env: env, from: config.From, origin: origin}
+func New(env Env, config Config) *Notifier {
+	return &Notifier{env: env, config: config}
 }
 
 func NewIdempotencyKey() IdempotencyKey {
@@ -73,7 +73,7 @@ func NewIdempotencyKey() IdempotencyKey {
 
 func (n *Notifier) NotifyUserBanned(ctx context.Context, key IdempotencyKey, to Address, reason string) error {
 	return n.deliver(ctx, KindUserBanned, key, to,
-		"your access to "+string(n.origin)+" was revoked: "+reason)
+		"your access to "+string(n.config.Origin)+" was revoked: "+reason)
 }
 
 func (n *Notifier) deliver(ctx context.Context, kind Kind, key IdempotencyKey, to Address, body string) error {
@@ -88,7 +88,7 @@ func (n *Notifier) deliver(ctx context.Context, kind Kind, key IdempotencyKey, t
 	n.env.Logger().Info("notice delivered",
 		"kind", string(kind),
 		"key", string(key),
-		"from", string(n.from),
+		"from", string(n.config.From),
 		"to", string(to),
 		"body", body)
 

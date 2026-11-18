@@ -129,6 +129,8 @@ func (c *Config) check(r *confread.Reader) {
 		c.DatabaseFile = sqlite.ConnectionString(parsed)
 	}
 
+	c.Notifier.Origin = notifier.Origin(c.PublicURL)
+
 	if c.Backup.Dir == "" {
 		c.Backup.Dir = filepath.Join(filepath.Dir(c.DatabaseFile), "backups")
 	}

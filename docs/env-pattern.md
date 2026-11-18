@@ -76,12 +76,20 @@ concurrency.
 ## Services plug in the same way
 
 An external service client — a mailer, an object store, a third-party API —
-declares its own `Env`, takes it at construction, and is **embedded into
-`app`**. Its methods are then promoted, exactly like the sqlc ones, and a case
-reaches them through its own narrow `Env` without knowing the service exists as
-a type.
+lives in `internal/<service>` and owns four things:
 
-`internal/notifier` is the worked example. It declares what it needs:
+- **its own narrow `Env`**: what it needs from the rest of the system;
+- **its own `Config`**, with `DefaultConfig()`, `Register(r *confread.Reader)`
+  and `Check(r)`: its settings, their defaults, their flag and variable names
+  and the checks on them ([config.md](config.md));
+- **a constructor `New(env Env, config Config)`**;
+- **the methods a case calls**, promoted onto `app` by embedding.
+
+A case reaches the service through its own narrow `Env` without knowing the
+service exists as a type.
+
+`internal/notifier` is the worked example. It declares what it needs and what
+it is configured with:
 
 ```go
 // internal/notifier/notifier.go
@@ -90,12 +98,50 @@ type Env interface {
 	MetricsIncreaseNotification(ctx context.Context, kind string)
 }
 
-func New(env Env, from Address, origin Origin) *Notifier
+type Config struct {
+	From   Address
+	Origin Origin
+}
+
+func DefaultConfig() Config {
+	return Config{From: "noreply@example.invalid"}
+}
+
+func (c *Config) Register(r *confread.Reader) {
+	*c = DefaultConfig()
+
+	setFrom := func(raw string) error {
+		c.From = Address(raw)
+
+		return nil
+	}
+
+	r.Func("notifier-from", string(c.From), "sender address every notice is delivered from", setFrom)
+}
+
+func (c *Config) Check(r *confread.Reader) {
+	r.Require("notifier-from", c.From != "", "is empty")
+}
+
+func New(env Env, config Config) *Notifier
 
 func (n *Notifier) NotifyUserBanned(ctx context.Context, key IdempotencyKey, to Address, reason string) error
 ```
 
-`appState` embeds it:
+`appconfig` registers and checks it next to every other service, and fills the
+one field that comes from another setting — the origin a notice names is the
+panel's `public-url`:
+
+```go
+// internal/appconfig/config.go
+cfg.Notifier.Register(r)
+// ...
+r.Parse(args)
+cfg.Notifier.Check(r)
+c.Notifier.Origin = notifier.Origin(c.PublicURL)
+```
+
+`appState` embeds the service:
 
 ```go
 type appState struct {
@@ -109,11 +155,8 @@ and `newApp` constructs it against `a` itself, after `a` exists:
 
 ```go
 a.Metrics = metrics.New(a, config.Metrics)
-a.Notifier = notifier.New(a, config.Notifier, notifier.Origin(config.PublicURL))
+a.Notifier = notifier.New(a, config.Notifier)
 ```
-
-`config.Notifier` is the service's own `notifier.Config`: the package declares
-its settings and defaults and registers them itself ([config.md](config.md)).
 
 A case that wants to send a notice names the promoted method on its own `Env`
 and nothing more:
@@ -127,25 +170,26 @@ type Env interface {
 }
 ```
 
-Three properties fall out of that shape. The service is testable on its own,
-because its `Env` is two methods. The case is testable without it, because
-`moq` generates a `NotifyUserBanned` stub from the case's own contract. And
-replacing the delivery — the kit's notifier writes to the log; a real one dials
-SMTP — changes one file and no case, because the seam is the service, not the
-call site.
+Four properties fall out of that shape. The service is testable on its own,
+because its `Env` is two methods and its `Config` a literal. The case is
+testable without it, because `moq` generates a `NotifyUserBanned` stub from the
+case's own contract. Replacing the delivery — the kit's notifier writes to the
+log; a real one dials SMTP — changes one package and no case, because the seam
+is the service, not the call site. And a new setting for it — an SMTP host —
+is one line in its `Register`, not an edit to a central config file.
 
 The same trick handles the awkward moment in `newApp`: a service whose `Env` is
 `app` cannot be built before `app` exists, so it is assigned onto `a`
 afterwards. `metrics.Metrics` has the same shape and the same two lines.
 
-The parameters are named types (`notifier.Address`, `notifier.Origin`) rather
-than bare strings, because a constructor taking three strings is a constructor
-whose arguments can be swapped silently — see [rules.md](rules.md).
+The config fields are named types (`notifier.Address`, `notifier.Origin`)
+rather than bare strings, because two strings side by side can be swapped
+silently — see [rules.md](rules.md).
 
 ## Wiring is a compile error, not a runtime one
 
 ```go
-graph.NewHandler(a)
+graph.NewHandler(a, graph.Introspection(a.config.DevMode))
 ```
 
 `NewHandler` takes a `graph.Env`, so that call in `cmd/server/http.go` is the
@@ -357,7 +401,7 @@ Where the wiring stayed static, nothing rotted in seven years.
 context value to `*app` to find an open transaction, so `EnqueueJob` writes into
 it and a nested `WithTransaction` is refused instead of deadlocking. The
 resolver needs no cast: it holds `graph.Env` as a field, set once by
-`graph.NewHandler(a)`, which the compiler checks. The cast is not the
+`graph.NewHandler(a, …)`, which the compiler checks. The cast is not the
 anti-pattern above: it never reaches for a *foreign case's* contract in the
 middle of business logic.
 

@@ -1,6 +1,6 @@
 // Package page owns keyset paging for every list the API returns: the opaque
 // cursor a client hands back, the clamp on how many rows it may ask for, and
-// the probe row that says whether another page exists. See docs/graphql.md.
+// the probe row that says whether another page exists. See docs/pagination.md.
 package page
 
 import (

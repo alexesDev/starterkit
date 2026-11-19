@@ -126,5 +126,5 @@ func TestAuditLogLeavesAnAbsentFirstToTheConfiguredDefault(t *testing.T) {
 
 	calls := env.ListAuditLogCalls()
 	require.Len(t, calls, 1)
-	assert.Nil(t, calls[0].Input.First, "the schema supplied a default of its own")
+	require.Nil(t, calls[0].Input.First, "the schema supplied a default of its own")
 }

@@ -3,11 +3,6 @@
 Every list the API returns has one of two shapes. The first is the default and
 covers almost everything; the second is for one situation and says which.
 
-This is the rule the kit's lists are being moved to: today `auditLog` pages
-with a bare `Int64` cursor and counts on every request, and `users` and
-`admins` return everything at once. Until they are moved, this document is
-the target, not a description of them.
-
 ## The default: a connection with an opaque cursor
 
 ```graphql
@@ -25,7 +20,7 @@ type AuditLogConnection {
 }
 
 type AdminQuery {
-  auditLog(first: Int64 = 50, after: Cursor): AuditLogConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
 }
 ```
 
@@ -40,14 +35,16 @@ type AdminQuery {
   never reads. Today it carries the last row's id; a list that one day sorts by
   another column carries `(column, id)` in the same string, and no client
   changes. Only the server encodes and decodes it.
-- **`first` is clamped** to a default and a maximum from configuration. A
-  request for more gets the maximum, not an error.
+- **`first` is clamped** to a default and a maximum from configuration
+  (`page-default`, `page-max`). The schema declares no default of its own, so
+  an absent `first` gets the configured one. A request for more gets the
+  maximum, not an error.
 - **`totalCount` is computed only when asked.** It is a forced resolver, so
   `count(*)` runs for the page that shows a total and not for the one that
   only scrolls.
 - **One helper does the mechanics.** The clamp, the `limit + 1` probe, cutting
   the extra row and filling `pageInfo` live in one small package the cases
-  call; a list case passes its rows and the id of a row, and states nothing
+  call, `internal/page`; a list case passes its rows and the id of a row, and states nothing
   about paging itself.
 - **Sorting is by id only** until a screen needs another order. When one does,
   the cursor grows a column, the query's `where` becomes a row comparison on

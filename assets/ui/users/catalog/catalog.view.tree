@@ -7,6 +7,14 @@ $starterkit_users_catalog $starterkit_catalog
 	More $mol_button_minor
 		title \Show more
 		click? <=> more? null
+	menu_body /
+		<= Columns $airkit_columns
+			titles /
+				<= id_column_title @ \ID
+				<= email_column_title @ \Email
+				<= status_column_title @ \Status
+				<= seen_column_title @ \Last sign-in
+		<= Menu_links
 	menu_link_content* /
 		<= User_item* $mol_view
 			sub /
@@ -19,9 +27,12 @@ $starterkit_users_catalog $starterkit_catalog
 						<= Email* $starterkit_labeler_name
 							title \Email
 							value <= row_email* \
-						<= Status* $starterkit_labeler_name
+						<= Status* $mol_labeler
 							title \Status
-							value <= row_status* \
+							content /
+								<= Status_pill* $airkit_pill
+									tone <= row_tone* \neutral
+									title <= row_status* \
 						<= Seen* $starterkit_labeler_moment
 							title \Last sign-in
 							value <= row_last_sign_in* \

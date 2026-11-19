@@ -20,6 +20,13 @@ $starterkit_auditlog $mol_page
 			<= Detail* $starterkit_auditlog_labeler
 				title \Detail
 				value <= row_detail* \
+	Columns $airkit_columns
+		sticky true
+		titles /
+			<= at_column_title @ \At
+			<= action_column_title @ \Action
+			<= email_column_title @ \Email
+			<= detail_column_title @ \Detail
 	body /
 		<= List $mol_list
 			rows <= rows /

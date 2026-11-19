@@ -17,6 +17,12 @@ RUN git init -q . \
  && npm install --no-audit --no-fund \
  && npm install --no-audit --no-fund jsdom
 
+# The theme and widgets come from airkit, a mam package that follows its main
+# branch: the pack line names it, and mam clones it on the first build that
+# needs an $airkit_ module. MAM_PULL_DISABLED only stops mam from pulling the
+# pinned workspace above; a missing package is still cloned.
+RUN echo 'pack airkit git \https://github.com/alexesDev/airkit.git' >> .meta.tree
+
 # The workspace mounts this project's UI under its package name. Locally the
 # same thing is a symlink; see docs/frontend-mol.md.
 COPY assets/ui /mam/starterkit
@@ -28,7 +34,7 @@ RUN echo "${GIT_COMMIT}" | grep -Eqx '[0-9a-f]*' \
  && printf 'namespace $ {\n\texport const $starterkit_buildinfo_commit: string = %s\n}\n' "'${GIT_COMMIT}'" \
     > /mam/starterkit/buildinfo/commit/commit.ts
 
-RUN node node_modules/.bin/mam starterkit/app
+RUN MAM_PULL_DISABLED=1 node node_modules/.bin/mam starterkit/app
 
 FROM golang:1.26-alpine AS build
 

@@ -67,6 +67,13 @@ namespace $.$$ {
 			return this.row(id).lastSignInAt?.formatted ?? ''
 		}
 
+		override row_tone(id: string) {
+			const row = this.row(id)
+			if (row.banReason) return 'bad'
+
+			return row.isAdmin ? 'ok' : 'neutral'
+		}
+
 		override row_status(id: string) {
 			const row = this.row(id)
 			if (row.banReason) return 'banned'

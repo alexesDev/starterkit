@@ -3,6 +3,7 @@ $starterkit_app $starterkit_catalog
 	menu_title \Starterkit
 	plugins /
 		<= Theme $mol_theme_auto
+		<= Air $airkit_air
 	Skew $starterkit_buildinfo_skew
 	menu_foot /
 		<= Foot $mol_view

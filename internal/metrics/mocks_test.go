@@ -19,6 +19,9 @@ var _ metrics.Env = &EnvMock{}
 //
 //		// make and configure a mocked metrics.Env
 //		mockedEnv := &EnvMock{
+//			DeadJobsFunc: func(ctx context.Context) (metrics.DeadJobs, error) {
+//				panic("mock out the DeadJobs method")
+//			},
 //			TableRowCountsFunc: func(ctx context.Context) (map[string]int64, error) {
 //				panic("mock out the TableRowCounts method")
 //			},
@@ -29,18 +32,59 @@ var _ metrics.Env = &EnvMock{}
 //
 //	}
 type EnvMock struct {
+	// DeadJobsFunc mocks the DeadJobs method.
+	DeadJobsFunc func(ctx context.Context) (metrics.DeadJobs, error)
+
 	// TableRowCountsFunc mocks the TableRowCounts method.
 	TableRowCountsFunc func(ctx context.Context) (map[string]int64, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// DeadJobs holds details about calls to the DeadJobs method.
+		DeadJobs []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// TableRowCounts holds details about calls to the TableRowCounts method.
 		TableRowCounts []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
 	}
+	lockDeadJobs       sync.RWMutex
 	lockTableRowCounts sync.RWMutex
+}
+
+// DeadJobs calls DeadJobsFunc.
+func (mock *EnvMock) DeadJobs(ctx context.Context) (metrics.DeadJobs, error) {
+	if mock.DeadJobsFunc == nil {
+		panic("EnvMock.DeadJobsFunc: method is nil but Env.DeadJobs was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockDeadJobs.Lock()
+	mock.calls.DeadJobs = append(mock.calls.DeadJobs, callInfo)
+	mock.lockDeadJobs.Unlock()
+	return mock.DeadJobsFunc(ctx)
+}
+
+// DeadJobsCalls gets all the calls that were made to DeadJobs.
+// Check the length with:
+//
+//	len(mockedEnv.DeadJobsCalls())
+func (mock *EnvMock) DeadJobsCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockDeadJobs.RLock()
+	calls = mock.calls.DeadJobs
+	mock.lockDeadJobs.RUnlock()
+	return calls
 }
 
 // TableRowCounts calls TableRowCountsFunc.

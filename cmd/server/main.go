@@ -61,14 +61,21 @@ func run() error {
 
 	a.registerJobs()
 
+	err = a.setAsideUnregisteredJobs(ctx)
+	if err != nil {
+		return err
+	}
+
 	err = a.registerCronJobs()
 	if err != nil {
 		return err
 	}
 
-	go a.jobRunner.Start(ctx)
 	a.cronRunner.Start()
 	defer a.cronRunner.Stop()
+
+	stopJobs := a.startJobRunner()
+	defer stopJobs()
 
 	go func() {
 		metricsErr := a.Metrics.Run(ctx, func(err error) {
@@ -120,11 +127,25 @@ func run() error {
 		return fmt.Errorf("failed to serve: %w", err)
 	}
 
-	if errors.Is(err, http.ErrServerClosed) {
-		<-drained
-	}
+	<-drained
 
 	return nil
+}
+
+func (a *app) startJobRunner() func() {
+	jobsCtx, cancel := context.WithCancel(context.Background())
+	stopped := make(chan struct{})
+
+	go func() {
+		a.jobRunner.Start(jobsCtx)
+		close(stopped)
+	}()
+
+	return func() {
+		cancel()
+		<-stopped
+		a.log.Info("job runner stopped")
+	}
 }
 
 func metricsHandler(a *app) http.Handler {
@@ -179,8 +200,8 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 
 	queue := goqite.New(goqite.NewOpts{
 		DB:         conns.Queue,
-		Name:       "jobs",
-		MaxReceive: 3,
+		Name:       jobQueue,
+		MaxReceive: jobMaxReceive,
 		Timeout:    5 * time.Minute,
 	})
 
@@ -200,6 +221,7 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 			baseWrite:  writeQueries,
 			gate:       gate,
 			queue:      queue,
+			jobNames:   map[string]struct{}{},
 			jobRunner:  goqitejobs.NewRunner(runnerOpts),
 			cronRunner: cronjobs.New(ctx, log),
 		},
@@ -219,9 +241,20 @@ type jobLog struct {
 }
 
 func (l jobLog) Info(msg string, args ...any) {
+	if carriesError(args) {
+		l.log.Warn(msg, args...)
+		return
+	}
+
 	l.log.Debug(msg, args...)
 }
 
-func (l jobLog) Error(msg string, args ...any) {
-	l.log.Error(msg, args...)
+func carriesError(args []any) bool {
+	for i := 0; i+1 < len(args); i += 2 {
+		if args[i] == "error" {
+			return true
+		}
+	}
+
+	return false
 }

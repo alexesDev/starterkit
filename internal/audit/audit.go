@@ -7,6 +7,7 @@ package audit
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"starterkit/internal/confread"
@@ -31,6 +32,26 @@ type Entry struct {
 
 type Writer interface {
 	WriteAudit(ctx context.Context, entry Entry)
+}
+
+type Buffer struct {
+	mu      sync.Mutex
+	entries []Entry
+}
+
+func (b *Buffer) Add(entry Entry) {
+	b.mu.Lock()
+	b.entries = append(b.entries, entry)
+	b.mu.Unlock()
+}
+
+func (b *Buffer) Take() []Entry {
+	b.mu.Lock()
+	entries := b.entries
+	b.entries = nil
+	b.mu.Unlock()
+
+	return entries
 }
 
 type Config struct {

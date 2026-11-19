@@ -6,7 +6,6 @@ package appreq
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"starterkit/internal/audit"
 	"starterkit/internal/db"
@@ -21,8 +20,7 @@ type Request struct {
 	isAdmin bool
 	ip      string
 
-	mu     sync.Mutex
-	audits []audit.Entry
+	audits audit.Buffer
 }
 
 func New(ip string) *Request {
@@ -30,18 +28,11 @@ func New(ip string) *Request {
 }
 
 func (c *Request) AddAudit(entry audit.Entry) {
-	c.mu.Lock()
-	c.audits = append(c.audits, entry)
-	c.mu.Unlock()
+	c.audits.Add(entry)
 }
 
 func (c *Request) TakeAudit() []audit.Entry {
-	c.mu.Lock()
-	entries := c.audits
-	c.audits = nil
-	c.mu.Unlock()
-
-	return entries
+	return c.audits.Take()
 }
 
 func (c *Request) NewContext(ctx context.Context) context.Context {

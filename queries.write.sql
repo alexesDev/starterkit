@@ -36,3 +36,6 @@ values (?, ?, ?, ?, ?, ?);
 
 -- name: DBDeleteAuditLogBefore :exec
 delete from audit_log where created_at < ?;
+
+-- name: DBMoveJobToQueue :exec
+update goqite set queue = @queue where id = @id;

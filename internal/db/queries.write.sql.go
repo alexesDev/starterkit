@@ -134,6 +134,20 @@ func (q *WriteQueries) DBMarkSignIn(ctx context.Context, arg DBMarkSignInParams)
 	return result.RowsAffected()
 }
 
+const dBMoveJobToQueue = `-- name: DBMoveJobToQueue :exec
+update goqite set queue = ?1 where id = ?2
+`
+
+type DBMoveJobToQueueParams struct {
+	Queue string `json:"queue"`
+	ID    string `json:"id"`
+}
+
+func (q *WriteQueries) DBMoveJobToQueue(ctx context.Context, arg DBMoveJobToQueueParams) error {
+	_, err := q.db.ExecContext(ctx, dBMoveJobToQueue, arg.Queue, arg.ID)
+	return err
+}
+
 const dBUpsertUserByOIDC = `-- name: DBUpsertUserByOIDC :one
 insert into users (oidc_issuer, oidc_subject, email, name, last_signin_at, created_at)
 values (?, ?, ?, ?, ?, ?)

@@ -70,6 +70,33 @@ Retries, timeouts and the at-least-once guarantee come from goqite:
 `MaxReceive: 3`, `Timeout: 5 * time.Minute`, with the timeout extended while a
 handler runs. **A handler must be safe to run twice.**
 
+A job that fails all three receives stays in the table and never runs again;
+`starterkit_jobs_dead{reason="exhausted"}` counts it
+([metrics-and-shutdown.md](metrics-and-shutdown.md)). goqite reports a failed
+run through its one `Info` method, so `jobLog` logs any line that carries an
+`error` at Warn, and the rest — a job started, a timeout extended — at Debug.
+
+A write a job makes through its transaction's `env` is in that transaction. An
+audit entry is the exception, because it must survive the job failing: inside a
+`WithTransaction` with no request in scope, `WriteAudit` buffers on the
+transaction and the entries are written once it has committed or rolled back.
+Writing it at once would wait on the single write connection the job's own
+transaction is holding.
+
+## A job nobody registered
+
+goqite panics outside its own `recover` when it receives a job whose name has
+no handler, and a panic in its goroutine ends the process. A deploy that
+renames or deletes a job with messages still queued would crash-loop on start.
+
+So before the runner starts, `deadletterjobs` reads every queued message,
+decodes its job name, and moves any that no handler is registered for — or
+that cannot be decoded at all — to the `jobs-dead` queue, which nothing reads.
+Each one is logged at Warn with its id and name, and
+`starterkit_jobs_dead{reason="set_aside"}` counts them. Nothing is deleted: to
+run them after all, register the handler again and move them back with
+`update goqite set queue = 'jobs' where queue = 'jobs-dead';`.
+
 ## Cron
 
 `internal/cronjobs` wraps `robfig/cron/v3` with two things it lacks:
@@ -195,7 +222,10 @@ dropped needs a row that records the outcome, not more retries.
 
 ## Shutdown
 
-`main.go` builds the runner context from `signal.NotifyContext`, so SIGINT and
-SIGTERM cancel the job runner and stop the cron scheduler, while the HTTP server
-gets its drain window. An in-flight job finishes or times out and is
-redelivered. See [metrics-and-shutdown.md](metrics-and-shutdown.md).
+The job runner has its own context. SIGTERM cancels the context cron runs its
+enqueues with, so a tick during the drain enqueues nothing, and it starts the
+HTTP drain; jobs keep running through it. The runner's
+context is cancelled only after the HTTP server has shut down, and `run` waits
+for the runner — and so for every job in flight — before it closes the
+database. A job that is cut short is redelivered. See
+[metrics-and-shutdown.md](metrics-and-shutdown.md).

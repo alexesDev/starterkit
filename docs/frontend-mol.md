@@ -33,6 +33,7 @@ A $mol component is a directory holding a file triple:
 | `x.view.tree` | the declarative structure — what is rendered, what is bound |
 | `x.view.ts` | the behaviour, as a subclass overriding properties from the tree |
 | `x.view.css.ts` | styles, optional |
+| `x.view.css` | styles as plain CSS, optional; column widths of an `$airkit_columns` list go here |
 
 Names are global and derived from the path: `assets/ui/users/catalog/` is
 `$starterkit_users_catalog`. There are no imports — the builder resolves every

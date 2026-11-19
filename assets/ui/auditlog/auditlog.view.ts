@@ -26,7 +26,7 @@ namespace $.$$ {
 
 		@$mol_mem
 		override body(): readonly $mol_view[] {
-			return this.paging().has_next() ? [this.List(), this.More()] : [this.List()]
+			return this.paging().has_next() ? [this.Columns(), this.List(), this.More()] : [this.Columns(), this.List()]
 		}
 
 		rows() {

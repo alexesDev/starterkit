@@ -89,6 +89,7 @@ MAM_WORKSPACE ?= ../mam
 # rm first: `ln -sfn` onto an existing real directory silently creates the link
 # INSIDE it, and mam then builds an empty package into the workspace.
 ui-link:
+	grep -q '^pack airkit ' "$(MAM_WORKSPACE)/.meta.tree" || echo 'pack airkit git \https://github.com/alexesDev/airkit.git' >> "$(MAM_WORKSPACE)/.meta.tree"
 	rm -rf "$(MAM_WORKSPACE)/starterkit"
 	ln -s "$(CURDIR)/assets/ui" "$(MAM_WORKSPACE)/starterkit"
 	@echo "linked $(MAM_WORKSPACE)/starterkit -> assets/ui"

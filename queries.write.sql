@@ -14,7 +14,7 @@ update users
    and (users.last_signin_at is null or users.last_signin_at < sqlc.arg(issued_at));
 
 -- name: DBInsertAdmin :exec
-insert into admins (user_id, created_at) values (?, ?) on conflict(user_id) do nothing;
+insert into admins (user_id, created_at) values (?, ?);
 
 -- name: DBDeleteAdmin :execrows
 delete from admins

@@ -197,6 +197,21 @@ it did with it.
 For the same reason `WriteAudit` returns nothing: a failure is logged, not
 propagated. An unwritable audit row must not turn a clean 403 into a 500.
 
+## Cross-site requests are refused by the server
+
+The gate's session is a cookie, so a page on another site can make the browser
+send it. `routes()` wraps everything in the standard library's
+`http.CrossOriginProtection`: a non-safe request (`POST` and the rest) whose
+`Sec-Fetch-Site` is not `same-origin` or `none`, or whose `Origin` does not
+match its `Host`, gets a 403 before identity is even resolved. A request with
+neither header — `curl`, a server-side client — is not a browser and passes.
+
+That makes the defence explicit instead of resting on `Content-Type:
+application/json` forcing a preflight and on the cookie's `SameSite`. A proxy
+in front must keep the `Host` header (Traefik does by default); one that
+rewrites it needs `AddTrustedOrigin` for the public origin.
+`cmd/server/http_test.go` pins both sides.
+
 ## Two gates, not one
 
 `requireIdentity` in `cmd/server/http.go` is the application's own gate, and it

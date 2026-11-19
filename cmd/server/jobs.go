@@ -20,6 +20,7 @@ import (
 const (
 	jobPurgeAuditLog    = "purge-audit-log"
 	jobNotifyUserBanned = "notify-user-banned"
+	jobBackupDatabase   = "backup-database"
 )
 
 const (
@@ -96,9 +97,25 @@ func (a *app) EnqueueUserBannedNotice(ctx context.Context, userID int64) error {
 
 func (a *app) registerJobs() {
 	jobs.Register(a, jobPurgeAuditLog, func(ctx context.Context, _ struct{}) error {
-		return a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
+		err := a.WithTransaction(ctx, func(txCtx context.Context, env *app) error {
 			return purgeauditlog.Resolve(txCtx, env)
 		})
+		if err != nil {
+			return err
+		}
+
+		return db.ReclaimFreePages(ctx, a.conns.Write)
+	})
+
+	jobs.Register(a, jobBackupDatabase, func(ctx context.Context, _ struct{}) error {
+		path, err := a.BackupDatabase(ctx, a.Now())
+		if err != nil {
+			return err
+		}
+
+		a.log.Info("database copied", "path", string(path))
+
+		return nil
 	})
 
 	jobs.Register(a, jobNotifyUserBanned, func(ctx context.Context, params notifyuserbanned.Input) error {

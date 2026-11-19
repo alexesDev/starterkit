@@ -168,6 +168,27 @@ is public; that asymmetry is the point.
 
 Denied attempts are written to `audit_log`. See [auth-dex.md](auth-dex.md).
 
+## Introspection is a development feature
+
+`graph.NewHandler(a, graph.Introspection(a.config.DevMode))` adds gqlgen's
+introspection extension only in dev mode, next to the playground. In
+production `__schema` and `__type` answer `introspection disabled`: the schema
+is the kit's own client's contract, not a map handed to whoever reaches the
+endpoint. Codegen reads the SDL file, never a live server, so nothing in the
+build needs it on.
+
+## What a failure tells the caller
+
+The error presenter (`internal/graph/error_presenter.go`) logs a resolver's
+error and hands the caller only a reference, `internal error, ref <hex>`,
+because the error may name a column or a URL. Three kinds pass differently:
+
+- a parser or validator error, and `ErrNotAdmin`, pass unchanged — they carry
+  nothing the caller did not send;
+- a refused meta field (`__schema` with introspection off) passes unchanged;
+- a busy database (`db.IsBusy`) says `the database is busy, retry` and carries
+  `extensions.code = "RETRY"`, so a client can tell a retry from a bug.
+
 ## A command owns its transaction
 
 Resolvers are adapters. Each mutation field calls a command method on `app`, and

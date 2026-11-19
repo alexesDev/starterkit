@@ -75,7 +75,7 @@ mechanism and the failure modes the pattern has in practice, is in
 | A table | `make db-new name=...`, then `make db-up` |
 | A background job | `internal/case/<name>/` + a line in `cmd/server/jobs.go` |
 | A scheduled job | a line in `cmd/server/cron.go` |
-| An external service client | `internal/<service>/`, then embed it into `app` |
+| An external service client | `internal/<service>/` with its own `Env` and `Config` (`DefaultConfig`, `Register`, `Check`), built by `New(env, config)` and embedded into `app` — see [env-pattern.md](env-pattern.md) |
 | A setting | `Register` and `Check` on the `Config` of the package that reads it — see [config.md](config.md) |
 | A sentence a person reads | a method on `Catalog` and on each language type in `internal/texts/` |
 

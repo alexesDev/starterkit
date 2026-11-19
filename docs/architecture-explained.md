@@ -100,6 +100,9 @@ either applies to the next request rather than at the token's expiry.
 `requireIdentity` refuses a request with no verified user (`cmd/server/http.go`, `app.requireIdentity`). The
 GraphQL handler (`internal/graph/handler.go`) takes POST (and answers OPTIONS),
 caches parsed queries, and refuses an operation above a fixed complexity of 60.
+Introspection is on only in dev mode. Before any of this, the whole handler
+sits inside `http.CrossOriginProtection`, so a cross-site `POST` is a 403
+before identity is resolved.
 
 **5. The admin boundary.** Every real mutation lives under `Mutation.admin`.
 Its resolver calls `checkAdmin` (`internal/graph/resolver.go`, `Resolver.checkAdmin`), which reads
@@ -154,7 +157,9 @@ failed commits nothing.
 **11. Errors on the way out.** An infrastructure `error` reaches gqlgen's error
 presenter (`internal/graph/error_presenter.go`), which logs the cause with a
 random reference and returns only `internal error, ref <hex>` to the caller.
-Parser and validator errors and `ErrNotAdmin` pass through unchanged.
+Parser and validator errors, `ErrNotAdmin` and a refused meta field pass through
+unchanged; a busy database (`db.IsBusy`) answers `retry` with
+`extensions.code = "RETRY"`.
 
 **12. Audit, after the transaction.** While a request is in scope,
 `WriteAudit` only appends to the request (`cmd/server/auth.go`, `app.WriteAudit`). After the handler
@@ -289,9 +294,10 @@ tolerates absent parameters, or as separate queries.
 
 ### SQLite in WAL with separate pools
 
-One file, three pools (`internal/db/setup.go`, `Setup`): reads with up to 25
-connections and `query_only`, application writes with exactly one, and the
-queue with its own one. Every pragma is in the DSN (`internal/db/setup.go`, `open`) so it
+One file, four pools (`internal/db/setup.go`, `Setup`): reads with up to 25
+connections and `query_only`, application writes with exactly one, the queue
+with its own one, and a read-only (`mode=ro`) snapshot connection for the
+backup's `VACUUM INTO` (`internal/db/setup.go`, `openSnapshot`). Every pragma is in the DSN (`internal/db/setup.go`, `open`) so it
 applies to every connection the driver opens, including `busy_timeout`,
 `foreign_keys` and WAL. Writers use `_txlock=immediate` (`internal/db/setup.go`, `open`), so a
 transaction takes the write lock at `BEGIN` and waits for it instead of failing
@@ -305,7 +311,9 @@ that long. The queue's separate pool keeps its polling from queuing behind the
 application *for a connection*, but the database lock is still shared. One
 process owns the file, so there is no second replica to scale out to. Backing
 up a live WAL database needs SQLite's backup API or `VACUUM INTO`; copying the
-file is not a backup.
+file is not a backup. The kit's `backup-database` job runs `VACUUM INTO` on a
+cron spec and keeps the newest copies on the same disk, so getting them off the
+machine is still the operator's job.
 
 ### Integer timestamps and `dbtime.Stamp`
 

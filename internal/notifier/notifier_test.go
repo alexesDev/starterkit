@@ -24,7 +24,7 @@ func (e *envStub) MetricsIncreaseNotification(_ context.Context, kind string) {
 
 func TestNotifyUserBannedCountsWhatItDelivered(t *testing.T) {
 	env := &envStub{}
-	sender := notifier.New(env, notifier.DefaultConfig(), "https://panel.example")
+	sender := notifier.New(env, notifier.Config{From: "noreply@example.invalid", Origin: "https://panel.example"})
 
 	require.NoError(t, sender.NotifyUserBanned(t.Context(), notifier.NewIdempotencyKey(), "user@example.com", "spam"))
 	require.Equal(t, []string{string(notifier.KindUserBanned)}, env.kinds)
@@ -32,7 +32,7 @@ func TestNotifyUserBannedCountsWhatItDelivered(t *testing.T) {
 
 func TestDeliveryToNobodyIsAFailureRatherThanASilentDrop(t *testing.T) {
 	env := &envStub{}
-	sender := notifier.New(env, notifier.DefaultConfig(), "https://panel.example")
+	sender := notifier.New(env, notifier.Config{From: "noreply@example.invalid", Origin: "https://panel.example"})
 
 	require.Error(t, sender.NotifyUserBanned(t.Context(), notifier.NewIdempotencyKey(), "", "spam"))
 	require.Empty(t, env.kinds, "a notice that went nowhere must not be counted as sent")
@@ -40,7 +40,7 @@ func TestDeliveryToNobodyIsAFailureRatherThanASilentDrop(t *testing.T) {
 
 func TestDeliveryWithoutAKeyIsAFailureRatherThanAnUnguardedSend(t *testing.T) {
 	env := &envStub{}
-	sender := notifier.New(env, notifier.DefaultConfig(), "https://panel.example")
+	sender := notifier.New(env, notifier.Config{From: "noreply@example.invalid", Origin: "https://panel.example"})
 
 	require.Error(t, sender.NotifyUserBanned(t.Context(), "", "user@example.com", "spam"))
 	require.Empty(t, env.kinds, "a notice without a key must not be counted as sent")

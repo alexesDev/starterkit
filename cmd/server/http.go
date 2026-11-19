@@ -32,7 +32,8 @@ func (a *app) routes() http.Handler {
 		_, _ = w.Write([]byte("ready"))
 	})
 
-	mux.Handle("POST "+base+"/graphql", limitBody(a.requireIdentity(a.build.Announce(graph.NewHandler(a)))))
+	api := graph.NewHandler(a, graph.Introspection(a.config.DevMode))
+	mux.Handle("POST "+base+"/graphql", limitBody(a.requireIdentity(a.build.Announce(api))))
 
 	if a.config.DevMode {
 		mux.Handle("GET "+base+"/graphql", a.requireIdentity(playgroundPolicy(playground.Handler("Starterkit", base+"/graphql"))))
@@ -41,7 +42,7 @@ func (a *app) routes() http.Handler {
 	mux.Handle("GET "+base+"/settings.js", a.requireIdentity(settingsScript(base)))
 	mux.Handle("GET /", a.requireIdentity(assets.SPAHandler(base, a.build.Revision())))
 
-	return securityHeaders(a.withRequest(mux))
+	return securityHeaders(http.NewCrossOriginProtection().Handler(a.withRequest(mux)))
 }
 
 func settingsScript(basePath string) http.Handler {

@@ -14,9 +14,11 @@ import (
 	"maragu.dev/goqite"
 	goqitejobs "maragu.dev/goqite/jobs"
 
+	"starterkit/internal/case/makeadmin"
 	"starterkit/internal/case/notifyuserbanned"
 	"starterkit/internal/db"
 	"starterkit/internal/dbtime"
+	"starterkit/internal/graph/model"
 	"starterkit/internal/logger"
 	"starterkit/internal/metrics"
 )
@@ -237,4 +239,21 @@ func TestAStampRoundTripsThroughSQLite(t *testing.T) {
 
 	require.NotNil(t, identity.LastSigninAt, "an integer time column must read back as a stamp")
 	require.True(t, issued.Equal(identity.LastSigninAt.Time), "stored %s, read back %s", issued, identity.LastSigninAt)
+}
+
+func TestMakingAnAdminTwiceIsADomainAnswer(t *testing.T) {
+	a := newTestApp(t)
+
+	user, err := a.WriteQueries.DBUpsertUserByOIDC(t.Context(), testUser("e"))
+	require.NoError(t, err)
+
+	input := makeadmin.Input{UserID: user.ID}
+
+	first, err := a.MakeAdmin(t.Context(), input)
+	require.NoError(t, err)
+	require.IsType(t, &model.MakeAdminPayload{}, first)
+
+	second, err := a.MakeAdmin(t.Context(), input)
+	require.NoError(t, err, "a unique violation surfaced as an infrastructure failure")
+	require.Equal(t, &model.ErrorPayload{Message: "user is already an admin"}, second)
 }

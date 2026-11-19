@@ -14,13 +14,14 @@ import (
 )
 
 type Set struct {
-	Read  *sql.DB
-	Write *sql.DB
-	Queue *sql.DB
+	Read     *sql.DB
+	Write    *sql.DB
+	Queue    *sql.DB
+	Snapshot *sql.DB
 }
 
 func (s *Set) Close() {
-	for _, conn := range []*sql.DB{s.Read, s.Write, s.Queue} {
+	for _, conn := range []*sql.DB{s.Read, s.Write, s.Queue, s.Snapshot} {
 		if conn != nil {
 			_ = conn.Close()
 		}
@@ -44,15 +45,47 @@ func Setup(ctx context.Context, file string) (*Set, error) {
 		return nil, err
 	}
 
-	queue, err := open(ctx, file, false)
-	if err != nil {
-		_ = read.Close()
-		_ = write.Close()
+	set := &Set{Read: read, Write: write}
 
+	set.Queue, err = open(ctx, file, false)
+	if err != nil {
+		set.Close()
 		return nil, err
 	}
 
-	return &Set{Read: read, Write: write, Queue: queue}, nil
+	set.Snapshot, err = openSnapshot(ctx, file)
+	if err != nil {
+		set.Close()
+		return nil, err
+	}
+
+	return set, nil
+}
+
+func openSnapshot(ctx context.Context, file string) (*sql.DB, error) {
+	u := &url.URL{Scheme: "file", Opaque: file}
+	q := u.Query()
+
+	q.Set("mode", "ro")
+	q.Add("_pragma", "busy_timeout(20000)")
+
+	u.RawQuery = q.Encode()
+
+	conn, err := sql.Open("sqlite", u.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to open the snapshot connection: %w", err)
+	}
+
+	conn.SetMaxOpenConns(1)
+	conn.SetMaxIdleConns(1)
+
+	err = conn.PingContext(ctx)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("failed to ping the snapshot connection: %w", err)
+	}
+
+	return conn, nil
 }
 
 func Migrate(file string) error {

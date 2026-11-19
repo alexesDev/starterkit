@@ -127,7 +127,8 @@ is the pattern worth copying.
 
 | Job | What it is |
 |---|---|
-| `purge-audit-log` | Cron enqueues it on `STARTERKIT_AUDIT_PURGE_SPEC` (default 04:00); the job deletes `audit_log` rows older than `STARTERKIT_AUDIT_RETENTION` (default 30 days). Setting the retention to `0` disables the purge. |
+| `purge-audit-log` | Cron enqueues it on `STARTERKIT_AUDIT_PURGE_SPEC` (default 04:00); the job deletes `audit_log` rows older than `STARTERKIT_AUDIT_RETENTION` (default 30 days), then returns the freed pages to the file. Setting the retention to `0` disables the purge. |
+| `backup-database` | Cron enqueues it on `STARTERKIT_BACKUP_SPEC` (default 03:30) unless `STARTERKIT_BACKUP_KEEP` is `0`; the job copies the database with `VACUUM INTO` and keeps the newest copies. See [data-layer.md](data-layer.md). |
 | `notify-user-banned` | Enqueued inside the transaction that writes the ban, with an idempotency key minted by that enqueue. The job loads the user and the ban and hands the notice and the key to `internal/notifier`. A user deleted or unbanned between the enqueue and the run is the answer, not a failure. |
 
 ## A call that creates something elsewhere carries an idempotency key

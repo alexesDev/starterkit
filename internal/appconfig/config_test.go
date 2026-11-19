@@ -17,6 +17,18 @@ func TestTheDefaultsStartAPanel(t *testing.T) {
 	require.Equal(t, "data.sqlite3", cfg.DatabaseFile)
 	require.Equal(t, 15*time.Second, cfg.Shutdown.Timeout)
 	require.Len(t, cfg.Proxies.Trusted, 2)
+	require.Equal(t, "backups", cfg.Backup.Dir)
+	require.Equal(t, "http://panel.sk.localbox", string(cfg.Notifier.Origin), "a notice names the public origin")
+}
+
+func TestBackupsLandBesideTheDatabaseUnlessADirIsNamed(t *testing.T) {
+	cfg, err := appconfig.Parse(nil, []string{"DATABASE_URL=sqlite:/var/lib/panel/panel.sqlite3"})
+	require.NoError(t, err)
+	require.Equal(t, "/var/lib/panel/backups", cfg.Backup.Dir)
+
+	cfg, err = appconfig.Parse([]string{"--backup-dir=/mnt/copies"}, []string{"DATABASE_URL=sqlite:/var/lib/panel/panel.sqlite3"})
+	require.NoError(t, err)
+	require.Equal(t, "/mnt/copies", cfg.Backup.Dir)
 }
 
 func TestEachServiceReadsItsOwnVariables(t *testing.T) {

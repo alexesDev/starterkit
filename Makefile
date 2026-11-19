@@ -2,7 +2,7 @@
 # says `dev`. Only the image build is told a revision — see docs/build-info.md.
 LDFLAGS := -s -w
 
-.PHONY: dev mol-dev run build build-amd64 test lint fmt generate gqlgen sqlc moq \
+.PHONY: dev mol-dev run build build-amd64 test lint vuln fmt generate gqlgen sqlc moq \
         db-new db-up db-down db-status ui ui-link codegen \
         up down status purge
 
@@ -41,6 +41,9 @@ lint:
 	./internal/db/list_queries.sh
 	go vet ./...
 	go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint run
+
+vuln:
+	go tool golang.org/x/vuln/cmd/govulncheck ./...
 
 # ---- codegen ------------------------------------------------------------
 

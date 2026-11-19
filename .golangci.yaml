@@ -80,7 +80,6 @@ linters:
     - protogetter
     - reassign
     - rowserrcheck
-    - sloglint
     - spancheck
     - sqlclosecheck
     - staticcheck
@@ -124,7 +123,9 @@ linters:
             - "!**/main.go"
           deny:
             - pkg: log$
-              desc: use log/slog instead
+              desc: use starterkit/internal/logger instead
+            - pkg: log/slog$
+              desc: use starterkit/internal/logger instead, which is backed by zerolog
 
     errcheck:
       check-type-assertions: true
@@ -178,10 +179,6 @@ linters:
     reassign:
       patterns:
         - ".*"
-
-    sloglint:
-      no-global: all
-      context: scope
 
     staticcheck:
       checks:

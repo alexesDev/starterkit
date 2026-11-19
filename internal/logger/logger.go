@@ -1,31 +1,41 @@
-// Package logger is the narrow logging port every use case sees.
+// Package logger is the narrow logging port every use case sees. zerolog is
+// behind it: JSON lines to stderr, or a console format in dev mode.
 package logger
 
 import (
 	"errors"
-	"log/slog"
+	"io"
 	"os"
+	"time"
+
+	"github.com/rs/zerolog"
 
 	"starterkit/internal/confread"
 )
 
 type Config struct {
-	Level slog.Level
+	Level zerolog.Level
+}
+
+func DefaultConfig() Config {
+	return Config{Level: zerolog.InfoLevel}
 }
 
 func (c *Config) Register(r *confread.Reader) {
-	*c = Config{Level: slog.LevelInfo}
+	*c = DefaultConfig()
 
 	setLevel := func(raw string) error {
-		err := c.Level.UnmarshalText([]byte(raw))
-		if err != nil {
+		level, err := zerolog.ParseLevel(raw)
+		if err != nil || raw == "" {
 			return errors.New("must be debug, info, warn or error")
 		}
+
+		c.Level = level
 
 		return nil
 	}
 
-	r.Func("log-level", "info", "debug|info|warn|error", setLevel)
+	r.Func("log-level", c.Level.String(), "debug|info|warn|error", setLevel)
 }
 
 type Logger interface {
@@ -36,43 +46,45 @@ type Logger interface {
 	With(args ...any) Logger
 }
 
-type slogLogger struct {
-	log *slog.Logger
+type zeroLogger struct {
+	log zerolog.Logger
 }
 
 func New(config Config, pretty bool) Logger {
-	opts := &slog.HandlerOptions{Level: config.Level}
-
-	var handler slog.Handler
+	var out io.Writer = os.Stderr
 	if pretty {
-		handler = slog.NewTextHandler(os.Stderr, opts)
-	} else {
-		handler = slog.NewJSONHandler(os.Stderr, opts)
+		out = zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.TimeOnly}
 	}
 
-	return &slogLogger{log: slog.New(handler)}
+	return build(out, config)
 }
 
-func (l *slogLogger) Debug(msg string, args ...any) {
-	l.log.Debug(msg, args...)
+func build(out io.Writer, config Config) Logger {
+	log := zerolog.New(out).Level(config.Level).With().Timestamp().Logger()
+
+	return &zeroLogger{log: log}
 }
 
-func (l *slogLogger) Info(msg string, args ...any) {
-	l.log.Info(msg, args...)
+func (l *zeroLogger) Debug(msg string, args ...any) {
+	l.log.Debug().Fields(args).Msg(msg)
 }
 
-func (l *slogLogger) Warn(msg string, args ...any) {
-	l.log.Warn(msg, args...)
+func (l *zeroLogger) Info(msg string, args ...any) {
+	l.log.Info().Fields(args).Msg(msg)
 }
 
-func (l *slogLogger) Error(msg string, args ...any) {
-	l.log.Error(msg, args...)
+func (l *zeroLogger) Warn(msg string, args ...any) {
+	l.log.Warn().Fields(args).Msg(msg)
 }
 
-func (l *slogLogger) With(args ...any) Logger {
-	return &slogLogger{log: l.log.With(args...)}
+func (l *zeroLogger) Error(msg string, args ...any) {
+	l.log.Error().Fields(args).Msg(msg)
+}
+
+func (l *zeroLogger) With(args ...any) Logger {
+	return &zeroLogger{log: l.log.With().Fields(args).Logger()}
 }
 
 func Discard() Logger {
-	return &slogLogger{log: slog.New(slog.DiscardHandler)}
+	return &zeroLogger{log: zerolog.Nop()}
 }

@@ -15,18 +15,20 @@ type settings struct {
 	addr     string
 	dev      bool
 	interval time.Duration
+	keep     int
 }
 
 func read(t *testing.T, args, environ []string) (settings, error) {
 	t.Helper()
 
-	got := settings{addr: "127.0.0.1:1", interval: time.Minute}
+	got := settings{addr: "127.0.0.1:1", interval: time.Minute, keep: 7}
 	r := confread.New("test", "KIT_", environ)
 	r.SetOutput(&bytes.Buffer{})
 
 	r.String(&got.addr, "listen-addr", "where to listen")
 	r.Bool(&got.dev, "dev-mode", "development mode")
 	r.Duration(&got.interval, "poll-interval", time.Second, "how often to poll")
+	r.Int(&got.keep, "keep", 0, "how many to keep")
 
 	r.Parse(args)
 	r.Require("listen-addr", got.addr != "", "is empty")
@@ -37,15 +39,15 @@ func read(t *testing.T, args, environ []string) (settings, error) {
 func TestDefaultsStandWithNothingSet(t *testing.T) {
 	got, err := read(t, nil, []string{"HOME=/root"})
 	require.NoError(t, err)
-	require.Equal(t, settings{addr: "127.0.0.1:1", interval: time.Minute}, got)
+	require.Equal(t, settings{addr: "127.0.0.1:1", interval: time.Minute, keep: 7}, got)
 }
 
 func TestTheEnvironmentNameIsDerivedFromTheFlag(t *testing.T) {
-	environ := []string{"KIT_LISTEN_ADDR=0.0.0.0:2", "KIT_DEV_MODE=true", "KIT_POLL_INTERVAL=5s"}
+	environ := []string{"KIT_LISTEN_ADDR=0.0.0.0:2", "KIT_DEV_MODE=true", "KIT_POLL_INTERVAL=5s", "KIT_KEEP=3"}
 
 	got, err := read(t, nil, environ)
 	require.NoError(t, err)
-	require.Equal(t, settings{addr: "0.0.0.0:2", dev: true, interval: 5 * time.Second}, got)
+	require.Equal(t, settings{addr: "0.0.0.0:2", dev: true, interval: 5 * time.Second, keep: 3}, got)
 }
 
 func TestAFlagWinsOverTheEnvironment(t *testing.T) {
@@ -73,9 +75,10 @@ func TestEveryProblemIsReportedAtOnce(t *testing.T) {
 }
 
 func TestABadFlagIsCollectedRatherThanStoppingTheParse(t *testing.T) {
-	_, err := read(t, []string{"--poll-interval=1ms", "--dev-mode=maybe"}, nil)
+	_, err := read(t, []string{"--poll-interval=1ms", "--dev-mode=maybe", "--keep=-1"}, nil)
 	require.Error(t, err)
 
+	require.Contains(t, err.Error(), "--keep: must be a whole number of at least 0")
 	require.Contains(t, err.Error(), "--poll-interval: must be a duration with a unit, such as 30s, of at least 1s")
 	require.Contains(t, err.Error(), "--dev-mode: must be true or false")
 }

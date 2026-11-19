@@ -51,10 +51,11 @@ on it without a cycle. A check that relates two services stays in
 | `appconfig` | `addr`, `public-url`, `base-path`, `database-url`, `repo-url`, `sign-out-url`, `bootstrap-admin`, `dev-mode`, `shutdown-delay`, `shutdown-timeout` |
 | `gateauth` | `oidc-issuer`, `oidc-client-id` |
 | `audit` | `audit-retention`, `audit-purge-spec` |
+| `backup` | `backup-dir`, `backup-spec`, `backup-keep` |
 | `notifier` | `notifier-from` |
 | `clientip` | `trusted-proxies` |
 | `metrics` | `metrics-addr`, `metrics-interval` |
-| `logger` | `log-level` |
+| `logger` | `log-level` (zerolog behind `logger.Logger`: JSON lines on stderr, a console format with a short time in `dev-mode`) |
 | `page` | `page-default`, `page-max` |
 
 `go run ./cmd/server --help` prints the full list, each line with its variable.

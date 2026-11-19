@@ -10,7 +10,9 @@ import (
 	"starterkit/internal/graph/generated"
 )
 
-func NewHandler(env Env) *handler.Server {
+type Introspection bool
+
+func NewHandler(env Env, introspection Introspection) *handler.Server {
 	resolver := Resolver{Env: env}
 	executable := generated.NewExecutableSchema(generated.Config{Resolvers: &resolver})
 	srv := handler.New(executable)
@@ -18,7 +20,9 @@ func NewHandler(env Env) *handler.Server {
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.POST{})
 	srv.SetQueryCache(lru.New[*ast.QueryDocument](200))
-	srv.Use(extension.Introspection{})
+	if introspection {
+		srv.Use(extension.Introspection{})
+	}
 	srv.Use(extension.FixedComplexityLimit(60))
 
 	srv.SetErrorPresenter(errorPresenter(env.Logger()))

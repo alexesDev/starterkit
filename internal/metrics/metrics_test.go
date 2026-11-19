@@ -105,3 +105,24 @@ func TestACounterIsPublishedOnceItMoves(t *testing.T) {
 	body := scrape(t, m)
 	require.Contains(t, body, `starterkit_notifications_total{kind="user_banned"} 1`)
 }
+
+func TestRunReturnsWhenItsContextEnds(t *testing.T) {
+	env := &EnvMock{
+		TableRowCountsFunc: func(context.Context) (map[string]int64, error) {
+			return map[string]int64{}, nil
+		},
+		DeadJobsFunc: noDeadJobs,
+	}
+
+	m := metrics.New(env, metrics.DefaultConfig())
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error)
+
+	go func() {
+		done <- m.Run(ctx, nil)
+	}()
+
+	cancel()
+	require.ErrorIs(t, <-done, context.Canceled)
+}

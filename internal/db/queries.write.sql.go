@@ -44,7 +44,7 @@ func (q *WriteQueries) DBDeleteUserBan(ctx context.Context, userID int64) error 
 }
 
 const dBInsertAdmin = `-- name: DBInsertAdmin :exec
-insert into admins (user_id, created_at) values (?, ?) on conflict(user_id) do nothing
+insert into admins (user_id, created_at) values (?, ?)
 `
 
 type DBInsertAdminParams struct {

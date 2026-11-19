@@ -79,6 +79,21 @@ func (r *Reader) Duration(p *time.Duration, name string, least time.Duration, us
 	r.define(name, usage, p.String(), set, false)
 }
 
+func (r *Reader) Int(p *int, name string, least int, usage string) {
+	set := func(raw string) error {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < least {
+			return errors.New("must be a whole number of at least " + strconv.Itoa(least))
+		}
+
+		*p = value
+
+		return nil
+	}
+
+	r.define(name, usage, strconv.Itoa(*p), set, false)
+}
+
 func (r *Reader) Func(name, byDefault, usage string, set func(raw string) error) {
 	r.define(name, usage, byDefault, set, false)
 }

@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"starterkit/internal/case/banuser"
+	"starterkit/internal/case/listadmins"
 	"starterkit/internal/case/listauditlog"
+	"starterkit/internal/case/listusers"
 	"starterkit/internal/case/makeadmin"
 	"starterkit/internal/case/removeadmin"
 	"starterkit/internal/case/unbanuser"
@@ -48,6 +50,14 @@ func (a *app) RemoveAdmin(ctx context.Context, input removeadmin.Input) (removea
 	})
 }
 
-func (a *app) ListAuditLog(ctx context.Context, limit int64, before *int64) (*listauditlog.Result, error) {
-	return listauditlog.Resolve(ctx, a, listauditlog.Input{Limit: limit, Before: before})
+func (a *app) ListAuditLog(ctx context.Context, input listauditlog.Input) (*listauditlog.Result, error) {
+	return listauditlog.Resolve(ctx, a, input)
+}
+
+func (a *app) ListUsers(ctx context.Context, input listusers.Input) (*listusers.Result, error) {
+	return listusers.Resolve(ctx, a, input)
+}
+
+func (a *app) ListAdmins(ctx context.Context, input listadmins.Input) (*listadmins.Result, error) {
+	return listadmins.Resolve(ctx, a, input)
 }

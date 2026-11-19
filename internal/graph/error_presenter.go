@@ -11,12 +11,17 @@ import (
 
 	"starterkit/internal/logger"
 	"starterkit/internal/model"
+	"starterkit/internal/page"
 )
 
 func errorPresenter(log logger.Logger) graphql.ErrorPresenterFunc {
 	return func(ctx context.Context, err error) *gqlerror.Error {
 		if errors.Is(err, model.ErrNotAdmin) {
 			return gqlerror.WrapPath(graphql.GetPath(ctx), model.ErrNotAdmin)
+		}
+
+		if errors.Is(err, page.ErrInvalidCursor) {
+			return gqlerror.WrapPath(graphql.GetPath(ctx), page.ErrInvalidCursor)
 		}
 
 		var gqlErr *gqlerror.Error

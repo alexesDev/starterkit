@@ -1,7 +1,6 @@
-query ($limit: Int64!, $before: Int64) {
+query ($first: Int64!, $after: Cursor) {
 	admin {
-		auditLog(limit: $limit, before: $before) {
-			totalCount
+		auditLog(first: $first, after: $after) {
 			pageInfo {
 				hasNextPage
 				endCursor

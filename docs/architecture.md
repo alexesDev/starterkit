@@ -27,6 +27,7 @@ cmd/server
         ├── internal/case/*     the business logic, one package per use case
         ├── internal/notifier   a service object, embedded into app
         ├── internal/dbtime     the type every time column binds to
+        ├── internal/page       keyset paging: the cursor, the clamp, the probe row
         └── internal/db         sqlc-generated queries, split read/write
                 │
                 ▼

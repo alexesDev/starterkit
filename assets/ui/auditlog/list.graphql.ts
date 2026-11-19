@@ -2,19 +2,18 @@
 namespace $ {
 
 export type starterkit_auditlog_listQueryVariables = Exact<{
-  limit: Scalars['Int64']['input'];
-  before?: InputMaybe<Scalars['Int64']['input']>;
+  first: Scalars['Int64']['input'];
+  after?: InputMaybe<Scalars['Cursor']['input']>;
 }>;
 
 
-export type starterkit_auditlog_listQuery = { __typename?: 'Query', admin: { __typename?: 'AdminQuery', auditLog: { __typename?: 'AuditLogConnection', totalCount: number, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: number | null }, nodes: Array<{ __typename?: 'AuditLogEntry', id: number, action: string, email: string, detail: string, ip: string, createdAt: { __typename?: 'Timestamp', formatted: string } }> } } };
+export type starterkit_auditlog_listQuery = { __typename?: 'Query', admin: { __typename?: 'AdminQuery', auditLog: { __typename?: 'AuditLogConnection', pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor?: string | null }, nodes: Array<{ __typename?: 'AuditLogEntry', id: number, action: string, email: string, detail: string, ip: string, createdAt: { __typename?: 'Timestamp', formatted: string } }> } } };
 
 
 export function $starterkit_auditlog_list(variables: starterkit_auditlog_listQueryVariables, opts?: { revalidate?: boolean }): starterkit_auditlog_listQuery {
-	return $starterkit_gql_request(`query starterkit_auditlog_list(\u0024limit: Int64!, \u0024before: Int64) {
+	return $starterkit_gql_request(`query starterkit_auditlog_list(\u0024first: Int64!, \u0024after: Cursor) {
   admin {
-    auditLog(limit: \u0024limit, before: \u0024before) {
-      totalCount
+    auditLog(first: \u0024first, after: \u0024after) {
       pageInfo {
         hasNextPage
         endCursor

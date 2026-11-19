@@ -18,6 +18,7 @@ import (
 	"starterkit/internal/logger"
 	"starterkit/internal/metrics"
 	"starterkit/internal/notifier"
+	"starterkit/internal/page"
 )
 
 type app struct {
@@ -70,6 +71,10 @@ func (a *app) Now() time.Time {
 
 func (a *app) AuditRetention() time.Duration {
 	return a.config.Audit.Retention
+}
+
+func (a *app) PageLimits() page.Limits {
+	return a.config.Page
 }
 
 func (a *app) BootstrapAdminEmail() string {

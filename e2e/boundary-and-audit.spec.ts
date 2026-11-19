@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { loginViaDex } from './helpers/session';
 import { ADMIN, ADMIN_STATE_PATH, GATE_URL, USER, USER_STATE_PATH } from './helpers/constants';
-import { apiContext, fetchWholeAuditLog, gql } from './helpers/api';
+import { apiContext, fetchAuditLogNewestFirst, fetchWholeAuditLog, gql } from './helpers/api';
 import { fetchStarterkitMetrics, waitForMetrics } from './helpers/metrics';
 
 const DENIED_USERS_QUERY = 'starterkit_admin_denied_total{operation="denied:query:users"}';
@@ -53,6 +53,23 @@ test('user logs in, is not an admin, and the admin namespace refuses them', asyn
 		const deniedRows = entries.filter((e) => e.action.startsWith('denied:') && e.email === USER.email);
 		expect(deniedRows.length, 'denied: rows for the non-admin user').toBeGreaterThan(0);
 		expect(deniedRows.map((e) => e.action)).toContain('denied:query:users');
+	} finally {
+		await adminApi.dispose();
+	}
+});
+
+test('the audit log pages by cursor with no row repeated or skipped', async () => {
+	const adminApi = await apiContext(ADMIN_STATE_PATH);
+
+	try {
+		const whole = await fetchAuditLogNewestFirst(adminApi, 500);
+		expect(whole.length, 'too few rows to page through').toBeGreaterThan(2);
+
+		const paged = await fetchAuditLogNewestFirst(adminApi, 1);
+		expect(paged.map((e) => e.id)).toEqual(whole.map((e) => e.id));
+
+		const forged = await gql(adminApi, '{ admin { auditLog(after: "not-a-cursor!") { nodes { id } } } }');
+		expect(forged.errors?.[0]?.message).toBe('invalid cursor: pass back an endCursor this API returned');
 	} finally {
 		await adminApi.dispose();
 	}

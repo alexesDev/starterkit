@@ -1,9 +1,8 @@
 namespace $ {
 	export type $starterkit_paging_page<Node> = {
-		totalCount: number
 		pageInfo: {
 			hasNextPage: boolean
-			endCursor?: number | null
+			endCursor?: string | null
 		}
 		nodes: readonly Node[]
 	}
@@ -13,18 +12,18 @@ namespace $ {
 			return 50
 		}
 
-		fetch(before: number | null): $starterkit_paging_page<Node> {
+		fetch(after: string | null): $starterkit_paging_page<Node> {
 			throw new Error('$starterkit_paging.fetch is not implemented')
 		}
 
 		@$mol_mem
-		cursors(next?: number[]) {
-			return next ?? [0]
+		cursors(next?: readonly string[]) {
+			return next ?? ['']
 		}
 
 		@$mol_mem_key
-		page(before: number) {
-			return this.fetch(before || null)
+		page(after: string) {
+			return this.fetch(after || null)
 		}
 
 		@$mol_mem
@@ -37,10 +36,6 @@ namespace $ {
 			return this.pages().flatMap(page => page.nodes as Node[])
 		}
 
-		total() {
-			return this.pages()[0]?.totalCount ?? 0
-		}
-
 		last() {
 			const pages = this.pages()
 			return pages[pages.length - 1]
@@ -51,14 +46,10 @@ namespace $ {
 		}
 
 		more() {
-			const last = this.last()
-			if (!last?.pageInfo.hasNextPage || last.pageInfo.endCursor == null) return
+			const end = this.last()?.pageInfo.endCursor
+			if (!this.has_next() || !end) return
 
-			this.cursors([...this.cursors(), last.pageInfo.endCursor])
-		}
-
-		reset() {
-			this.cursors([0])
+			this.cursors([...this.cursors(), end])
 		}
 	}
 }

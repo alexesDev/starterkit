@@ -11,10 +11,10 @@ namespace $.$$ {
 					return view.page_size()
 				}
 
-				override fetch(before: number | null) {
+				override fetch(after: string | null) {
 					return $starterkit_auditlog_list({
-						limit: this.page_size(),
-						before,
+						first: this.page_size(),
+						after,
 					}).admin.auditLog
 				}
 			})()
@@ -22,10 +22,6 @@ namespace $.$$ {
 
 		entries() {
 			return this.paging().items()
-		}
-
-		total() {
-			return this.paging().total()
 		}
 
 		@$mol_mem

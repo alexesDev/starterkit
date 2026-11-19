@@ -13,6 +13,7 @@ import (
 	"starterkit/internal/dbtime"
 	model1 "starterkit/internal/graph/model"
 	"starterkit/internal/model"
+	"starterkit/internal/page"
 	"strconv"
 	"sync/atomic"
 
@@ -36,6 +37,7 @@ type ResolverRoot interface {
 	AdminQuery() AdminQueryResolver
 	AdminUser() AdminUserResolver
 	AdminsConnection() AdminsConnectionResolver
+	AuditLogConnection() AuditLogConnectionResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 	UsersConnection() UsersConnectionResolver
@@ -59,10 +61,10 @@ type AdminMutationResolver interface {
 	RemoveAdmin(ctx context.Context, obj *model.AdminMutation, input model1.RemoveAdminInput) (model1.RemoveAdminOrErrorPayload, error)
 }
 type AdminQueryResolver interface {
-	Users(ctx context.Context, obj *model.AdminQuery) (*model1.UsersConnection, error)
+	Users(ctx context.Context, obj *model.AdminQuery, first *int64, after *page.Cursor) (*model1.UsersConnection, error)
 	User(ctx context.Context, obj *model.AdminQuery, id int64) (*db.DBListUsersRow, error)
-	Admins(ctx context.Context, obj *model.AdminQuery) (*model1.AdminsConnection, error)
-	AuditLog(ctx context.Context, obj *model.AdminQuery, limit int64, before *int64) (*model1.AuditLogConnection, error)
+	Admins(ctx context.Context, obj *model.AdminQuery, first *int64, after *page.Cursor) (*model1.AdminsConnection, error)
+	AuditLog(ctx context.Context, obj *model.AdminQuery, first *int64, after *page.Cursor) (*model1.AuditLogConnection, error)
 	Build(ctx context.Context, obj *model.AdminQuery) (*buildinfo.Info, error)
 }
 type AdminUserResolver interface {
@@ -70,7 +72,9 @@ type AdminUserResolver interface {
 }
 type AdminsConnectionResolver interface {
 	TotalCount(ctx context.Context, obj *model1.AdminsConnection) (int64, error)
-	Nodes(ctx context.Context, obj *model1.AdminsConnection) ([]db.DBListAdminsRow, error)
+}
+type AuditLogConnectionResolver interface {
+	TotalCount(ctx context.Context, obj *model1.AuditLogConnection) (int64, error)
 }
 type MutationResolver interface {
 	SignOut(ctx context.Context) (*model1.SignOutPayload, error)
@@ -82,7 +86,6 @@ type QueryResolver interface {
 }
 type UsersConnectionResolver interface {
 	TotalCount(ctx context.Context, obj *model1.UsersConnection) (int64, error)
-	Nodes(ctx context.Context, obj *model1.UsersConnection) ([]db.DBListUsersRow, error)
 }
 type ViewerResolver interface {
 	User(ctx context.Context, obj *model.Viewer) (*db.User, error)
@@ -193,6 +196,8 @@ func newExecutionContext(
 var sources = []*ast.Source{
 	{Name: "../schema.graphqls", Input: `scalar Int64
 
+scalar Cursor @goModel(model: "starterkit/internal/page.Cursor")
+
 directive @goField(
   forceResolver: Boolean
   name: String
@@ -243,10 +248,10 @@ type SignOutPayload {
 }
 
 type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
-  users: UsersConnection!
+  users(first: Int64, after: Cursor): UsersConnection!
   user(id: Int64!): AdminUser
-  admins: AdminsConnection!
-  auditLog(limit: Int64! = 50, before: Int64): AuditLogConnection!
+  admins(first: Int64, after: Cursor): AdminsConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
   build: Build!
 }
 
@@ -265,7 +270,8 @@ type AdminMutation @goModel(model: "starterkit/internal/model.AdminMutation") {
 
 type UsersConnection {
   totalCount: Int64! @goField(forceResolver: true)
-  nodes: [AdminUser!]! @goField(forceResolver: true)
+  nodes: [AdminUser!]!
+  pageInfo: PageInfo!
 }
 
 type AdminUser @goModel(model: "starterkit/internal/db.DBListUsersRow") {
@@ -280,7 +286,8 @@ type AdminUser @goModel(model: "starterkit/internal/db.DBListUsersRow") {
 
 type AdminsConnection {
   totalCount: Int64! @goField(forceResolver: true)
-  nodes: [Admin!]! @goField(forceResolver: true)
+  nodes: [Admin!]!
+  pageInfo: PageInfo!
 }
 
 type Admin @goModel(model: "starterkit/internal/db.DBListAdminsRow") {
@@ -290,15 +297,15 @@ type Admin @goModel(model: "starterkit/internal/db.DBListAdminsRow") {
   createdAt: Timestamp!
 }
 
-type AuditLogConnection @goModel(model: "starterkit/internal/graph/model.AuditLogConnection") {
-  totalCount: Int64!
+type AuditLogConnection {
+  totalCount: Int64! @goField(forceResolver: true)
   nodes: [AuditLogEntry!]!
   pageInfo: PageInfo!
 }
 
-type PageInfo @goModel(model: "starterkit/internal/graph/model.PageInfo") {
+type PageInfo @goModel(model: "starterkit/internal/page.Info") {
   hasNextPage: Boolean!
-  endCursor: Int64
+  endCursor: Cursor
 }
 
 type AuditLogEntry @goModel(model: "starterkit/internal/db.AuditLog") {
@@ -439,6 +446,8 @@ func (ec *executionContext) childFields_AdminsConnection(ctx context.Context, fi
 		return ec.fieldContext_AdminsConnection_totalCount(ctx, field)
 	case "nodes":
 		return ec.fieldContext_AdminsConnection_nodes(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_AdminsConnection_pageInfo(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type AdminsConnection", field.Name)
 }
@@ -545,6 +554,8 @@ func (ec *executionContext) childFields_UsersConnection(ctx context.Context, fie
 		return ec.fieldContext_UsersConnection_totalCount(ctx, field)
 	case "nodes":
 		return ec.fieldContext_UsersConnection_nodes(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_UsersConnection_pageInfo(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type UsersConnection", field.Name)
 }
@@ -731,25 +742,47 @@ func (ec *executionContext) field_AdminMutation_unbanUser_args(ctx context.Conte
 	return args, nil
 }
 
-func (ec *executionContext) field_AdminQuery_auditLog_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_AdminQuery_admins_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit",
-		func(ctx context.Context, v any) (int64, error) {
-			return ec.unmarshalNInt642int64(ctx, v)
-		})
-	if err != nil {
-		return nil, err
-	}
-	args["limit"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "before",
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
 		func(ctx context.Context, v any) (*int64, error) {
 			return ec.unmarshalOInt642ᚖint64(ctx, v)
 		})
 	if err != nil {
 		return nil, err
 	}
-	args["before"] = arg1
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*page.Cursor, error) {
+			return ec.unmarshalOCursor2ᚖstarterkitᚋinternalᚋpageᚐCursor(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_AdminQuery_auditLog_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int64, error) {
+			return ec.unmarshalOInt642ᚖint64(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*page.Cursor, error) {
+			return ec.unmarshalOCursor2ᚖstarterkitᚋinternalᚋpageᚐCursor(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
 	return args, nil
 }
 
@@ -764,6 +797,28 @@ func (ec *executionContext) field_AdminQuery_user_args(ctx context.Context, rawA
 		return nil, err
 	}
 	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_AdminQuery_users_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int64, error) {
+			return ec.unmarshalOInt642ᚖint64(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*page.Cursor, error) {
+			return ec.unmarshalOCursor2ᚖstarterkitᚋinternalᚋpageᚐCursor(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
 	return args, nil
 }
 
@@ -1141,7 +1196,8 @@ func (ec *executionContext) _AdminQuery_users(ctx context.Context, field graphql
 			return ec.fieldContext_AdminQuery_users(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.AdminQuery().Users(ctx, obj)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.AdminQuery().Users(ctx, obj, fc.Args["first"].(*int64), fc.Args["after"].(*page.Cursor))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model1.UsersConnection) graphql.Marshaler {
@@ -1151,7 +1207,7 @@ func (ec *executionContext) _AdminQuery_users(ctx context.Context, field graphql
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_AdminQuery_users(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AdminQuery_users(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AdminQuery",
 		Field:      field,
@@ -1160,6 +1216,17 @@ func (ec *executionContext) fieldContext_AdminQuery_users(_ context.Context, fie
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_UsersConnection(ctx, field)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_AdminQuery_users_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -1217,7 +1284,8 @@ func (ec *executionContext) _AdminQuery_admins(ctx context.Context, field graphq
 			return ec.fieldContext_AdminQuery_admins(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.AdminQuery().Admins(ctx, obj)
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.AdminQuery().Admins(ctx, obj, fc.Args["first"].(*int64), fc.Args["after"].(*page.Cursor))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model1.AdminsConnection) graphql.Marshaler {
@@ -1227,7 +1295,7 @@ func (ec *executionContext) _AdminQuery_admins(ctx context.Context, field graphq
 		true,
 	)
 }
-func (ec *executionContext) fieldContext_AdminQuery_admins(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_AdminQuery_admins(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "AdminQuery",
 		Field:      field,
@@ -1236,6 +1304,17 @@ func (ec *executionContext) fieldContext_AdminQuery_admins(_ context.Context, fi
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_AdminsConnection(ctx, field)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_AdminQuery_admins_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -1250,7 +1329,7 @@ func (ec *executionContext) _AdminQuery_auditLog(ctx context.Context, field grap
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.AdminQuery().AuditLog(ctx, obj, fc.Args["limit"].(int64), fc.Args["before"].(*int64))
+			return ec.Resolvers.AdminQuery().AuditLog(ctx, obj, fc.Args["first"].(*int64), fc.Args["after"].(*page.Cursor))
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *model1.AuditLogConnection) graphql.Marshaler {
@@ -1527,7 +1606,7 @@ func (ec *executionContext) _AdminsConnection_nodes(ctx context.Context, field g
 			return ec.fieldContext_AdminsConnection_nodes(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.AdminsConnection().Nodes(ctx, obj)
+			return obj.Nodes, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []db.DBListAdminsRow) graphql.Marshaler {
@@ -1541,10 +1620,42 @@ func (ec *executionContext) fieldContext_AdminsConnection_nodes(_ context.Contex
 	fc = &graphql.FieldContext{
 		Object:     "AdminsConnection",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_Admin(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminsConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model1.AdminsConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AdminsConnection_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *page.Info) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖstarterkitᚋinternalᚋpageᚐInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AdminsConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminsConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
 		},
 	}
 	return fc, nil
@@ -1559,7 +1670,7 @@ func (ec *executionContext) _AuditLogConnection_totalCount(ctx context.Context, 
 			return ec.fieldContext_AuditLogConnection_totalCount(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.TotalCount, nil
+			return ec.Resolvers.AuditLogConnection().TotalCount(ctx, obj)
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v int64) graphql.Marshaler {
@@ -1570,7 +1681,7 @@ func (ec *executionContext) _AuditLogConnection_totalCount(ctx context.Context, 
 	)
 }
 func (ec *executionContext) fieldContext_AuditLogConnection_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("AuditLogConnection", field, false, false, errors.New("field of type Int64 does not have child fields"))
+	return graphql.NewScalarFieldContext("AuditLogConnection", field, true, true, errors.New("field of type Int64 does not have child fields"))
 }
 
 func (ec *executionContext) _AuditLogConnection_nodes(ctx context.Context, field graphql.CollectedField, obj *model1.AuditLogConnection) (ret graphql.Marshaler) {
@@ -1617,8 +1728,8 @@ func (ec *executionContext) _AuditLogConnection_pageInfo(ctx context.Context, fi
 			return obj.PageInfo, nil
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *model1.PageInfo) graphql.Marshaler {
-			return ec.marshalNPageInfo2ᚖstarterkitᚋinternalᚋgraphᚋmodelᚐPageInfo(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *page.Info) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖstarterkitᚋinternalᚋpageᚐInfo(ctx, selections, v)
 		},
 		true,
 		true,
@@ -2096,7 +2207,7 @@ func (ec *executionContext) fieldContext_Mutation_admin(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *model1.PageInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *page.Info) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -2119,7 +2230,7 @@ func (ec *executionContext) fieldContext_PageInfo_hasNextPage(_ context.Context,
 	return graphql.NewScalarFieldContext("PageInfo", field, false, false, errors.New("field of type Boolean does not have child fields"))
 }
 
-func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model1.PageInfo) (ret graphql.Marshaler) {
+func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *page.Info) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
@@ -2131,15 +2242,15 @@ func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graph
 			return obj.EndCursor, nil
 		},
 		nil,
-		func(ctx context.Context, selections ast.SelectionSet, v *int64) graphql.Marshaler {
-			return ec.marshalOInt642ᚖint64(ctx, selections, v)
+		func(ctx context.Context, selections ast.SelectionSet, v *page.Cursor) graphql.Marshaler {
+			return ec.marshalOCursor2ᚖstarterkitᚋinternalᚋpageᚐCursor(ctx, selections, v)
 		},
 		true,
 		false,
 	)
 }
 func (ec *executionContext) fieldContext_PageInfo_endCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	return graphql.NewScalarFieldContext("PageInfo", field, false, false, errors.New("field of type Int64 does not have child fields"))
+	return graphql.NewScalarFieldContext("PageInfo", field, false, false, errors.New("field of type Cursor does not have child fields"))
 }
 
 func (ec *executionContext) _Query_viewer(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -2551,7 +2662,7 @@ func (ec *executionContext) _UsersConnection_nodes(ctx context.Context, field gr
 			return ec.fieldContext_UsersConnection_nodes(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.UsersConnection().Nodes(ctx, obj)
+			return obj.Nodes, nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []db.DBListUsersRow) graphql.Marshaler {
@@ -2565,10 +2676,42 @@ func (ec *executionContext) fieldContext_UsersConnection_nodes(_ context.Context
 	fc = &graphql.FieldContext{
 		Object:     "UsersConnection",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_AdminUser(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UsersConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model1.UsersConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_UsersConnection_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *page.Info) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖstarterkitᚋinternalᚋpageᚐInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_UsersConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "UsersConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
 		},
 	}
 	return fc, nil
@@ -4544,43 +4687,15 @@ func (ec *executionContext) _AdminsConnection(ctx context.Context, sel ast.Selec
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "nodes":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._AdminsConnection_nodes(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._AdminsConnection_nodes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
 			}
-
-			if field.IsDeferred() {
-				deferredFieldSet.AddField(field)
-				fieldIndex := len(deferredFieldSet.Values) - 1
-				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, deferredFieldSet)
-				})
-
-				for _, deferrable := range field.Deferrables {
-					view, ok := deferLabelToView[deferrable.Label]
-					if !ok {
-						view = deferredFieldSet.NewView()
-						deferLabelToView[deferrable.Label] = view
-					}
-					view.AddIndices(fieldIndex)
-				}
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
+		case "pageInfo":
+			out.Values[i] = ec._AdminsConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
 			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4615,19 +4730,52 @@ func (ec *executionContext) _AuditLogConnection(ctx context.Context, sel ast.Sel
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("AuditLogConnection")
 		case "totalCount":
-			out.Values[i] = ec._AuditLogConnection_totalCount(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AuditLogConnection_totalCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
 			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "nodes":
 			out.Values[i] = ec._AuditLogConnection_nodes(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		case "pageInfo":
 			out.Values[i] = ec._AuditLogConnection_pageInfo(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				out.Invalids++
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -4985,7 +5133,7 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 
 var pageInfoImplementors = []string{"PageInfo"}
 
-func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet, obj *model1.PageInfo) graphql.Marshaler {
+func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet, obj *page.Info) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, pageInfoImplementors)
 
 	out := graphql.NewFieldSet(fields)
@@ -5386,43 +5534,15 @@ func (ec *executionContext) _UsersConnection(ctx context.Context, sel ast.Select
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "nodes":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._UsersConnection_nodes(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
+			out.Values[i] = ec._UsersConnection_nodes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
 			}
-
-			if field.IsDeferred() {
-				deferredFieldSet.AddField(field)
-				fieldIndex := len(deferredFieldSet.Values) - 1
-				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, deferredFieldSet)
-				})
-
-				for _, deferrable := range field.Deferrables {
-					view, ok := deferLabelToView[deferrable.Label]
-					if !ok {
-						view = deferredFieldSet.NewView()
-						deferLabelToView[deferrable.Label] = view
-					}
-					view.AddIndices(fieldIndex)
-				}
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
+		case "pageInfo":
+			out.Values[i] = ec._UsersConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
 			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -6157,7 +6277,7 @@ func (ec *executionContext) marshalNMakeAdminOrErrorPayload2starterkitᚋinterna
 	return ec._MakeAdminOrErrorPayload(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNPageInfo2ᚖstarterkitᚋinternalᚋgraphᚋmodelᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *model1.PageInfo) graphql.Marshaler {
+func (ec *executionContext) marshalNPageInfo2ᚖstarterkitᚋinternalᚋpageᚐInfo(ctx context.Context, sel ast.SelectionSet, v *page.Info) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
@@ -6444,6 +6564,22 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
 	return res
+}
+
+func (ec *executionContext) unmarshalOCursor2ᚖstarterkitᚋinternalᚋpageᚐCursor(ctx context.Context, v any) (*page.Cursor, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(page.Cursor)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOCursor2ᚖstarterkitᚋinternalᚋpageᚐCursor(ctx context.Context, sel ast.SelectionSet, v *page.Cursor) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
 }
 
 func (ec *executionContext) unmarshalOInt642ᚖint64(ctx context.Context, v any) (*int64, error) {

@@ -1,7 +1,10 @@
-query {
+query ($first: Int64!, $after: Cursor) {
 	admin {
-		users {
-			totalCount
+		users(first: $first, after: $after) {
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
 			nodes {
 				id
 				email

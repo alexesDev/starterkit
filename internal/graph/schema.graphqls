@@ -1,5 +1,7 @@
 scalar Int64
 
+scalar Cursor @goModel(model: "starterkit/internal/page.Cursor")
+
 directive @goField(
   forceResolver: Boolean
   name: String
@@ -50,10 +52,10 @@ type SignOutPayload {
 }
 
 type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
-  users: UsersConnection!
+  users(first: Int64, after: Cursor): UsersConnection!
   user(id: Int64!): AdminUser
-  admins: AdminsConnection!
-  auditLog(limit: Int64! = 50, before: Int64): AuditLogConnection!
+  admins(first: Int64, after: Cursor): AdminsConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
   build: Build!
 }
 
@@ -72,7 +74,8 @@ type AdminMutation @goModel(model: "starterkit/internal/model.AdminMutation") {
 
 type UsersConnection {
   totalCount: Int64! @goField(forceResolver: true)
-  nodes: [AdminUser!]! @goField(forceResolver: true)
+  nodes: [AdminUser!]!
+  pageInfo: PageInfo!
 }
 
 type AdminUser @goModel(model: "starterkit/internal/db.DBListUsersRow") {
@@ -87,7 +90,8 @@ type AdminUser @goModel(model: "starterkit/internal/db.DBListUsersRow") {
 
 type AdminsConnection {
   totalCount: Int64! @goField(forceResolver: true)
-  nodes: [Admin!]! @goField(forceResolver: true)
+  nodes: [Admin!]!
+  pageInfo: PageInfo!
 }
 
 type Admin @goModel(model: "starterkit/internal/db.DBListAdminsRow") {
@@ -97,15 +101,15 @@ type Admin @goModel(model: "starterkit/internal/db.DBListAdminsRow") {
   createdAt: Timestamp!
 }
 
-type AuditLogConnection @goModel(model: "starterkit/internal/graph/model.AuditLogConnection") {
-  totalCount: Int64!
+type AuditLogConnection {
+  totalCount: Int64! @goField(forceResolver: true)
   nodes: [AuditLogEntry!]!
   pageInfo: PageInfo!
 }
 
-type PageInfo @goModel(model: "starterkit/internal/graph/model.PageInfo") {
+type PageInfo @goModel(model: "starterkit/internal/page.Info") {
   hasNextPage: Boolean!
-  endCursor: Int64
+  endCursor: Cursor
 }
 
 type AuditLogEntry @goModel(model: "starterkit/internal/db.AuditLog") {

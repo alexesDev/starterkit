@@ -218,7 +218,7 @@ select * from users where id = ?;
 
 -- name: DBListAuditLog :many
 select * from audit_log
- where (id < sqlc.arg(before) or sqlc.arg(before) = 0)
+ where id < sqlc.arg(before)
  order by id desc
  limit sqlc.arg(page_limit);
 ```
@@ -233,16 +233,16 @@ pointing at an unrelated line.
 
 One gotcha on `sqlc.arg`: sqlc infers a parameter's Go type from its first use.
 `where (sqlc.arg(before) = 0 or id < sqlc.arg(before))` infers `interface{}`
-from the comparison against a literal; putting the column comparison first —
-`where (id < sqlc.arg(before) or sqlc.arg(before) = 0)` — infers `int64`.
+from the comparison against a literal; a parameter compared to a column —
+`where id < sqlc.arg(before)` — infers `int64`.
 
 ## Pagination
 
-The audit log uses keyset pagination, which is the right default for an
-append-only table:
+Every list pages by keyset on its id, newest first — the audit log, users and
+admins alike:
 
 ```graphql
-auditLog(limit: 50, before: 1234) {
+auditLog(first: 50, after: "MTIzNA") {
   totalCount
   nodes { id action email createdAt { formatted(layout: "2006-01-02 15:04:05") } }
   pageInfo { hasNextPage endCursor }
@@ -251,8 +251,12 @@ auditLog(limit: 50, before: 1234) {
 
 `id` is autoincrement, so `order by id desc` is `created_at desc` without the
 ties a second-granularity timestamp produces. Pass the previous page's
-`endCursor` back as `before`. The case fetches `limit + 1` rows and trims the
-extra one — that is how `hasNextPage` is known without a second query.
+`endCursor` back as `after`; it is an opaque string only the server decodes.
+`internal/page` turns the arguments into the query's `before` and `page_limit`
+— `math.MaxInt64` for the first page, so the query has no branch — fetches
+`first + 1` rows and trims the extra one, which is how `hasNextPage` is known
+without a second query. `totalCount` is a forced resolver, so `count(*)` runs
+only for a request that selects it.
 
 Offset pagination would let the UI jump to page N, at the cost of scanning at
 depth and shifting rows under the reader whenever a new entry lands. For a log

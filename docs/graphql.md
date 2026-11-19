@@ -9,8 +9,8 @@ Schema first: edit the SDL, run `make gqlgen`, implement whatever stub appears.
 A resolver translates and delegates. It contains no logic:
 
 ```go
-func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, limit int64, before *int64) (*model.AuditLogConnection, error) {
-	return r.Env.ListAuditLog(ctx, limit, before)
+func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, first *int64, after *page.Cursor) (*model.AuditLogConnection, error) {
+	return r.Env.ListAuditLog(ctx, page.Args{First: first, After: after})
 }
 ```
 
@@ -137,10 +137,10 @@ type Query {
 }
 
 type AdminQuery {
-  users: UsersConnection!
+  users(first: Int64, after: Cursor): UsersConnection!
   user(id: Int64!): AdminUser
-  admins: AdminsConnection!
-  auditLog(limit: Int64! = 50, before: Int64): AuditLogConnection!
+  admins(first: Int64, after: Cursor): AdminsConnection!
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
   build: Build!
 }
 ```
@@ -216,40 +216,55 @@ the transaction already holding it. `cmd/server/tx_test.go` covers this.
 
 ## Connection types
 
-Two shapes, deliberately:
+Every list has one shape — the audit log, users and admins alike:
 
 ```graphql
-type UsersConnection {
+scalar Cursor
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: Cursor
+}
+
+type AuditLogConnection {
   totalCount: Int64! @goField(forceResolver: true)
-  nodes: [AdminUser!]! @goField(forceResolver: true)
-}
-```
-
-**Both** fields are forced resolvers, and the parent returns an empty marker:
-
-```go
-func (r *adminQueryResolver) Users(ctx context.Context, obj *model1.AdminQuery) (*model.UsersConnection, error) {
-	return &model.UsersConnection{}, nil
-}
-```
-
-That is the whole point of the shape — each field costs a query only when it is
-selected. Computing `totalCount` eagerly in the parent looks harmless and
-quietly undoes it: a client asking for `nodes` alone would still pay for the
-count. If a connection field is not a forced resolver, work is happening that
-somebody did not ask for.
-
-```graphql
-type AuditLogConnection @goModel(model: "starterkit/internal/graph/model.AuditLogConnection") {
-  totalCount: Int64!
   nodes: [AuditLogEntry!]!
   pageInfo: PageInfo!
 }
+
+type AdminQuery {
+  auditLog(first: Int64, after: Cursor): AuditLogConnection!
+}
 ```
 
-The audit log is resolved eagerly and bound to a hand-written struct, because a
-keyset page and its `hasNextPage` come from one query — splitting them across
-resolvers would only mean running it twice.
+`nodes` and `pageInfo` come from one keyset query, so the field resolver runs
+the list case and returns both:
+
+```go
+func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuery, first *int64, after *page.Cursor) (*model.AuditLogConnection, error) {
+	return r.Env.ListAuditLog(ctx, page.Args{First: first, After: after})
+}
+```
+
+`totalCount` is a forced resolver over `DBCountAuditLog`, so `count(*)` runs
+only for a request that selects it. Computing it in the field resolver looks
+harmless and quietly undoes that: a client that only scrolls would pay for the
+count on every page. `internal/graph/handler_test.go` pins it.
+
+`internal/page` owns the mechanics, and a list case states nothing about
+paging itself: `Limits.Window` gives an absent `first` the configured default
+(`STARTERKIT_PAGE_DEFAULT`), clamps it to the configured maximum
+(`STARTERKIT_PAGE_MAX`; asking for more gets the maximum, not an error), and
+turns `after` into the id the query starts below. The schema declares no
+default of its own, so there is one number to change. `Cut` takes the rows and
+a function naming a row's id, drops the probe row and fills `pageInfo`.
+
+`Cursor` is opaque: the client hands back an `endCursor` and never reads it.
+Today it is the last row's id in base64; a list that one day sorts by another
+column carries that column in the same string, and no client changes. It is
+decoded while gqlgen reads the argument, so a cursor the server did not issue
+never reaches a case — the request fails with `invalid cursor`, which the
+error presenter passes through unmasked.
 
 ## Binding to database rows
 

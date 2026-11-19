@@ -204,8 +204,15 @@ const dBListAdmins = `-- name: DBListAdmins :many
 select a.user_id, a.created_at, u.email, u.name
   from admins a
   join users u on u.id = a.user_id
- order by a.created_at desc
+ where a.user_id < ?1
+ order by a.user_id desc
+ limit ?2
 `
+
+type DBListAdminsParams struct {
+	Before    int64 `json:"before"`
+	PageLimit int64 `json:"page_limit"`
+}
 
 type DBListAdminsRow struct {
 	UserID    int64        `json:"user_id"`
@@ -214,8 +221,8 @@ type DBListAdminsRow struct {
 	Name      string       `json:"name"`
 }
 
-func (q *Queries) DBListAdmins(ctx context.Context) ([]DBListAdminsRow, error) {
-	rows, err := q.db.QueryContext(ctx, dBListAdmins)
+func (q *Queries) DBListAdmins(ctx context.Context, arg DBListAdminsParams) ([]DBListAdminsRow, error) {
+	rows, err := q.db.QueryContext(ctx, dBListAdmins, arg.Before, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +251,7 @@ func (q *Queries) DBListAdmins(ctx context.Context) ([]DBListAdminsRow, error) {
 
 const dBListAuditLog = `-- name: DBListAuditLog :many
 select id, user_id, email, "action", detail, ip, created_at from audit_log
- where (id < ?1 or ?1 = 0)
+ where id < ?1
  order by id desc
  limit ?2
 `
@@ -328,8 +335,15 @@ select u.id,
   from users u
   left join admins a on a.user_id = u.id
   left join user_bans b on b.user_id = u.id
- order by u.id
+ where u.id < ?1
+ order by u.id desc
+ limit ?2
 `
+
+type DBListUsersParams struct {
+	Before    int64 `json:"before"`
+	PageLimit int64 `json:"page_limit"`
+}
 
 type DBListUsersRow struct {
 	ID           int64         `json:"id"`
@@ -341,8 +355,8 @@ type DBListUsersRow struct {
 	BanReason    string        `json:"ban_reason"`
 }
 
-func (q *Queries) DBListUsers(ctx context.Context) ([]DBListUsersRow, error) {
-	rows, err := q.db.QueryContext(ctx, dBListUsers)
+func (q *Queries) DBListUsers(ctx context.Context, arg DBListUsersParams) ([]DBListUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, dBListUsers, arg.Before, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}

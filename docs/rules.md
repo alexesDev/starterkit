@@ -350,6 +350,40 @@ probe; `purgeauditlog` keeps one because retention `<= 0` means do nothing;
 `notifyuserbanned` keeps one because a user unbanned between the enqueue and
 the run is an answer rather than a failure.
 
+## Plain code for each entity; shared code only for mechanics
+
+Every entity gets its own plain code: its own case per action, its own queries,
+its own resolvers, written out even when it looks like the neighbour's. There
+is no generic CRUD layer — no `Repository[T]`, no reflection over sqlc rows, no
+handler that serves "any entity" from a table of callbacks. A new entity is
+made by copying the closest one and changing what differs.
+
+It is the Go way, stated by the language's own proverbs: *a little copying is
+better than a little dependency*, and *clear is better than clever*. The reasons
+it holds here:
+
+- **What differs is the point.** Two entities share their shape and differ in
+  who may act, what is audited, which checks refuse with an `ErrorPayload`,
+  what happens after commit. A generic layer either grows a parameter or a
+  callback for each of those, or hides them; both make the one thing a reader
+  came for harder to find.
+- **The repetitive part is already generated.** sqlc writes the queries' Go,
+  gqlgen the resolvers' plumbing, moq the mocks. What is left by hand is the
+  case, and the case is where entities differ.
+- **Plain code is cheap to change.** A rule changed for one entity is changed
+  in its files and nowhere else; nobody has to prove the shared layer still
+  serves the other twenty. Whoever writes the next case — a person or a model —
+  copies a working neighbour and reads its narrow `Env` to see what it touches.
+
+**What is shared:** mechanics that are the same for every entity and decide
+nothing about any of them — paging and cursors, timestamps, error
+classification, configuration reading, the job runner. Those live in one
+package each and every entity calls them in a line.
+
+**When copying stops being cheap** — dozens of near-identical entities, one
+rule that has to change in all of them — the answer is a generator that writes
+the plain files, not a generic layer that runs them.
+
 ## A list field is a connection: `nodes` plus `totalCount`
 
 A field that answers with several of something returns a connection object —

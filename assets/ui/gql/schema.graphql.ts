@@ -30,14 +30,27 @@ export type Admin = {
 export type AdminMutation = {
   __typename?: 'AdminMutation';
   banUser: BanUserOrErrorPayload;
+  createMCPKey: CreateMCPKeyOrErrorPayload;
+  deleteMCPKey: DeleteMCPKeyOrErrorPayload;
   makeAdmin: MakeAdminOrErrorPayload;
   removeAdmin: RemoveAdminOrErrorPayload;
+  revokeMCPKey: RevokeMCPKeyOrErrorPayload;
   unbanUser: UnbanUserOrErrorPayload;
 };
 
 
 export type AdminMutationbanUserArgs = {
   input: BanUserInput;
+};
+
+
+export type AdminMutationcreateMCPKeyArgs = {
+  input: CreateMCPKeyInput;
+};
+
+
+export type AdminMutationdeleteMCPKeyArgs = {
+  input: DeleteMCPKeyInput;
 };
 
 
@@ -51,6 +64,11 @@ export type AdminMutationremoveAdminArgs = {
 };
 
 
+export type AdminMutationrevokeMCPKeyArgs = {
+  input: RevokeMCPKeyInput;
+};
+
+
 export type AdminMutationunbanUserArgs = {
   input: UnbanUserInput;
 };
@@ -60,6 +78,8 @@ export type AdminQuery = {
   admins: AdminsConnection;
   auditLog: AuditLogConnection;
   build: Build;
+  mcpKey?: Maybe<MCPKey>;
+  mcpKeys: MCPKeysConnection;
   user?: Maybe<AdminUser>;
   users: UsersConnection;
 };
@@ -72,6 +92,17 @@ export type AdminQueryadminsArgs = {
 
 
 export type AdminQueryauditLogArgs = {
+  after?: InputMaybe<Scalars['Cursor']['input']>;
+  first?: InputMaybe<Scalars['Int64']['input']>;
+};
+
+
+export type AdminQuerymcpKeyArgs = {
+  id: Scalars['Int64']['input'];
+};
+
+
+export type AdminQuerymcpKeysArgs = {
   after?: InputMaybe<Scalars['Cursor']['input']>;
   first?: InputMaybe<Scalars['Int64']['input']>;
 };
@@ -142,6 +173,29 @@ export type Build = {
   commitUrl?: Maybe<Scalars['String']['output']>;
 };
 
+export type CreateMCPKeyInput = {
+  name: Scalars['String']['input'];
+};
+
+export type CreateMCPKeyOrErrorPayload = CreateMCPKeyPayload | ErrorPayload;
+
+export type CreateMCPKeyPayload = {
+  __typename?: 'CreateMCPKeyPayload';
+  key: Scalars['String']['output'];
+  mcpKeyId: Scalars['Int64']['output'];
+};
+
+export type DeleteMCPKeyInput = {
+  mcpKeyId: Scalars['Int64']['input'];
+};
+
+export type DeleteMCPKeyOrErrorPayload = DeleteMCPKeyPayload | ErrorPayload;
+
+export type DeleteMCPKeyPayload = {
+  __typename?: 'DeleteMCPKeyPayload';
+  mcpKeyId: Scalars['Int64']['output'];
+};
+
 export type ErrorPayload = {
   __typename?: 'ErrorPayload';
   byFields: Array<FieldMessage>;
@@ -152,6 +206,23 @@ export type FieldMessage = {
   __typename?: 'FieldMessage';
   name: Scalars['String']['output'];
   value: Scalars['String']['output'];
+};
+
+export type MCPKey = {
+  __typename?: 'MCPKey';
+  createdAt: Timestamp;
+  id: Scalars['Int64']['output'];
+  lastUsedAt?: Maybe<Timestamp>;
+  name: Scalars['String']['output'];
+  ownerEmail: Scalars['String']['output'];
+  revokedAt?: Maybe<Timestamp>;
+};
+
+export type MCPKeysConnection = {
+  __typename?: 'MCPKeysConnection';
+  nodes: Array<MCPKey>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int64']['output'];
 };
 
 export type MakeAdminInput = {
@@ -192,6 +263,17 @@ export type RemoveAdminOrErrorPayload = ErrorPayload | RemoveAdminPayload;
 export type RemoveAdminPayload = {
   __typename?: 'RemoveAdminPayload';
   userId: Scalars['Int64']['output'];
+};
+
+export type RevokeMCPKeyInput = {
+  mcpKeyId: Scalars['Int64']['input'];
+};
+
+export type RevokeMCPKeyOrErrorPayload = ErrorPayload | RevokeMCPKeyPayload;
+
+export type RevokeMCPKeyPayload = {
+  __typename?: 'RevokeMCPKeyPayload';
+  mcpKeyId: Scalars['Int64']['output'];
 };
 
 export type SignOutPayload = {

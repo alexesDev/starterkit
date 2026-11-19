@@ -56,6 +56,8 @@ type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
   user(id: Int64!): AdminUser
   admins(first: Int64, after: Cursor): AdminsConnection!
   auditLog(first: Int64, after: Cursor): AuditLogConnection!
+  mcpKeys(first: Int64, after: Cursor): MCPKeysConnection!
+  mcpKey(id: Int64!): MCPKey
   build: Build!
 }
 
@@ -70,6 +72,9 @@ type AdminMutation @goModel(model: "starterkit/internal/model.AdminMutation") {
   unbanUser(input: UnbanUserInput!): UnbanUserOrErrorPayload!
   makeAdmin(input: MakeAdminInput!): MakeAdminOrErrorPayload!
   removeAdmin(input: RemoveAdminInput!): RemoveAdminOrErrorPayload!
+  createMCPKey(input: CreateMCPKeyInput!): CreateMCPKeyOrErrorPayload!
+  revokeMCPKey(input: RevokeMCPKeyInput!): RevokeMCPKeyOrErrorPayload!
+  deleteMCPKey(input: DeleteMCPKeyInput!): DeleteMCPKeyOrErrorPayload!
 }
 
 type UsersConnection {
@@ -86,6 +91,21 @@ type AdminUser @goModel(model: "starterkit/internal/db.DBListUsersRow") {
   lastSignInAt: Timestamp
   isAdmin: Boolean! @goField(forceResolver: true)
   banReason: String!
+}
+
+type MCPKeysConnection {
+  totalCount: Int64! @goField(forceResolver: true)
+  nodes: [MCPKey!]!
+  pageInfo: PageInfo!
+}
+
+type MCPKey @goModel(model: "starterkit/internal/db.DBListMCPKeysRow") {
+  id: Int64!
+  name: String!
+  ownerEmail: String!
+  createdAt: Timestamp!
+  lastUsedAt: Timestamp
+  revokedAt: Timestamp
 }
 
 type AdminsConnection {
@@ -172,3 +192,34 @@ type RemoveAdminPayload {
 }
 
 union RemoveAdminOrErrorPayload = RemoveAdminPayload | ErrorPayload
+
+input CreateMCPKeyInput {
+  name: String!
+}
+
+type CreateMCPKeyPayload {
+  mcpKeyId: Int64!
+  key: String!
+}
+
+union CreateMCPKeyOrErrorPayload = CreateMCPKeyPayload | ErrorPayload
+
+input RevokeMCPKeyInput {
+  mcpKeyId: Int64!
+}
+
+type RevokeMCPKeyPayload {
+  mcpKeyId: Int64!
+}
+
+union RevokeMCPKeyOrErrorPayload = RevokeMCPKeyPayload | ErrorPayload
+
+input DeleteMCPKeyInput {
+  mcpKeyId: Int64!
+}
+
+type DeleteMCPKeyPayload {
+  mcpKeyId: Int64!
+}
+
+union DeleteMCPKeyOrErrorPayload = DeleteMCPKeyPayload | ErrorPayload

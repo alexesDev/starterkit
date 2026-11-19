@@ -1,0 +1,37 @@
+$starterkit_mcpkeys_show $mol_page
+	mcp_key_id 0
+	title <= name \
+	tools <= actions /
+		<= Revoke $mol_button_minor
+			title \Revoke
+			click? <=> revoke? null
+		<= Delete $mol_button_minor
+			title \Delete
+			click? <=> delete? null
+	body /
+		<= Fields $mol_list
+			rows /
+				<= Id_field $mol_labeler
+					title \ID
+					content /
+						<= id_string \
+				<= Owner_field $mol_labeler
+					title \Owner
+					content /
+						<= owner \
+				<= Status_field $mol_labeler
+					title \Status
+					content /
+						<= status \
+				<= Created_field $mol_labeler
+					title \Created At
+					content /
+						<= created \
+				<= Used_field $starterkit_labeler_moment
+					title \Last used
+					value <= last_used \
+				<= Revoked_field $starterkit_labeler_moment
+					title \Revoked At
+					value <= revoked \
+		<= Status $mol_status
+			message <= message \

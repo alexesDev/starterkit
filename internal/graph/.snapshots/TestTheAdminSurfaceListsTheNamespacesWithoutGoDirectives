@@ -1,0 +1,7 @@
+Query (fields: 2)
+  Query.viewer -> Viewer (fields: 2)
+  Query.admin -> AdminQuery (fields: 7)
+Mutation (fields: 2)
+  Mutation.signOut -> SignOutPayload (fields: 1)
+  Mutation.admin -> AdminMutation (fields: 7)
+

@@ -1,0 +1,13 @@
+mutation ($input: DeleteMCPKeyInput!) {
+	admin {
+		deleteMCPKey(input: $input) {
+			__typename
+			... on DeleteMCPKeyPayload {
+				mcpKeyId
+			}
+			... on ErrorPayload {
+				message
+			}
+		}
+	}
+}

@@ -15,12 +15,24 @@ type BanUserOrErrorPayload interface {
 	IsBanUserOrErrorPayload()
 }
 
+type CreateMCPKeyOrErrorPayload interface {
+	IsCreateMCPKeyOrErrorPayload()
+}
+
+type DeleteMCPKeyOrErrorPayload interface {
+	IsDeleteMCPKeyOrErrorPayload()
+}
+
 type MakeAdminOrErrorPayload interface {
 	IsMakeAdminOrErrorPayload()
 }
 
 type RemoveAdminOrErrorPayload interface {
 	IsRemoveAdminOrErrorPayload()
+}
+
+type RevokeMCPKeyOrErrorPayload interface {
+	IsRevokeMCPKeyOrErrorPayload()
 }
 
 type UnbanUserOrErrorPayload interface {
@@ -50,6 +62,27 @@ type BanUserPayload struct {
 
 func (BanUserPayload) IsBanUserOrErrorPayload() {}
 
+type CreateMCPKeyInput struct {
+	Name string `json:"name"`
+}
+
+type CreateMCPKeyPayload struct {
+	MCPKeyID int64  `json:"mcpKeyId"`
+	Key      string `json:"key"`
+}
+
+func (CreateMCPKeyPayload) IsCreateMCPKeyOrErrorPayload() {}
+
+type DeleteMCPKeyInput struct {
+	MCPKeyID int64 `json:"mcpKeyId"`
+}
+
+type DeleteMCPKeyPayload struct {
+	MCPKeyID int64 `json:"mcpKeyId"`
+}
+
+func (DeleteMCPKeyPayload) IsDeleteMCPKeyOrErrorPayload() {}
+
 type ErrorPayload struct {
 	Message  string         `json:"message"`
 	ByFields []FieldMessage `json:"byFields"`
@@ -63,9 +96,21 @@ func (ErrorPayload) IsMakeAdminOrErrorPayload() {}
 
 func (ErrorPayload) IsRemoveAdminOrErrorPayload() {}
 
+func (ErrorPayload) IsCreateMCPKeyOrErrorPayload() {}
+
+func (ErrorPayload) IsRevokeMCPKeyOrErrorPayload() {}
+
+func (ErrorPayload) IsDeleteMCPKeyOrErrorPayload() {}
+
 type FieldMessage struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+type MCPKeysConnection struct {
+	TotalCount int64                 `json:"totalCount"`
+	Nodes      []db.DBListMCPKeysRow `json:"nodes"`
+	PageInfo   *page.Info            `json:"pageInfo"`
 }
 
 type MakeAdminInput struct {
@@ -93,6 +138,16 @@ type RemoveAdminPayload struct {
 }
 
 func (RemoveAdminPayload) IsRemoveAdminOrErrorPayload() {}
+
+type RevokeMCPKeyInput struct {
+	MCPKeyID int64 `json:"mcpKeyId"`
+}
+
+type RevokeMCPKeyPayload struct {
+	MCPKeyID int64 `json:"mcpKeyId"`
+}
+
+func (RevokeMCPKeyPayload) IsRevokeMCPKeyOrErrorPayload() {}
 
 type SignOutPayload struct {
 	RedirectURL string `json:"redirectUrl"`

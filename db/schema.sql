@@ -44,6 +44,15 @@ CREATE INDEX goqite_queue_priority_created_idx on goqite (queue, priority desc, 
 CREATE TRIGGER goqite_updated_timestamp after update on goqite begin
   update goqite set updated = strftime('%Y-%m-%dT%H:%M:%fZ') where id = old.id;
 end;
+CREATE TABLE mcp_keys (
+  id integer primary key autoincrement,
+  user_id integer not null references users(id) on delete cascade,
+  name text not null,
+  key_hash blob not null unique,
+  last_used_at integer,
+  revoked_at integer,
+  created_at integer not null
+) strict;
 -- Dbmate schema migrations
 INSERT INTO "schema_migrations" (version) VALUES
   ('20260810090000'),
@@ -51,4 +60,5 @@ INSERT INTO "schema_migrations" (version) VALUES
   ('20260810090200'),
   ('20260810090300'),
   ('20260810090400'),
-  ('20261118090000');
+  ('20261118090000'),
+  ('20261119090000');

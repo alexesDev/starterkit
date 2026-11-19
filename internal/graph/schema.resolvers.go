@@ -39,6 +39,21 @@ func (r *adminMutationResolver) RemoveAdmin(ctx context.Context, obj *model1.Adm
 	return r.Env.RemoveAdmin(ctx, input)
 }
 
+// CreateMCPKey is the resolver for the createMCPKey field.
+func (r *adminMutationResolver) CreateMCPKey(ctx context.Context, obj *model1.AdminMutation, input model.CreateMCPKeyInput) (model.CreateMCPKeyOrErrorPayload, error) {
+	return r.Env.CreateMCPKey(ctx, input)
+}
+
+// RevokeMCPKey is the resolver for the revokeMCPKey field.
+func (r *adminMutationResolver) RevokeMCPKey(ctx context.Context, obj *model1.AdminMutation, input model.RevokeMCPKeyInput) (model.RevokeMCPKeyOrErrorPayload, error) {
+	return r.Env.RevokeMCPKey(ctx, input)
+}
+
+// DeleteMCPKey is the resolver for the deleteMCPKey field.
+func (r *adminMutationResolver) DeleteMCPKey(ctx context.Context, obj *model1.AdminMutation, input model.DeleteMCPKeyInput) (model.DeleteMCPKeyOrErrorPayload, error) {
+	return r.Env.DeleteMCPKey(ctx, input)
+}
+
 // Users is the resolver for the users field.
 func (r *adminQueryResolver) Users(ctx context.Context, obj *model1.AdminQuery, first *int64, after *page.Cursor) (*model.UsersConnection, error) {
 	return r.Env.ListUsers(ctx, page.Args{First: first, After: after})
@@ -70,6 +85,27 @@ func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuer
 	return r.Env.ListAuditLog(ctx, page.Args{First: first, After: after})
 }
 
+// MCPKeys is the resolver for the mcpKeys field.
+func (r *adminQueryResolver) MCPKeys(ctx context.Context, obj *model1.AdminQuery, first *int64, after *page.Cursor) (*model.MCPKeysConnection, error) {
+	return r.Env.ListMCPKeys(ctx, page.Args{First: first, After: after})
+}
+
+// MCPKey is the resolver for the mcpKey field.
+func (r *adminQueryResolver) MCPKey(ctx context.Context, obj *model1.AdminQuery, id int64) (*db.DBListMCPKeysRow, error) {
+	row, err := r.Env.DBGetMCPKeyByID(ctx, id)
+	if db.IsNotFound(err) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load MCP key %d: %w", id, err)
+	}
+
+	bound := mcpKeyRow(row)
+
+	return &bound, nil
+}
+
 // Build is the resolver for the build field.
 func (r *adminQueryResolver) Build(ctx context.Context, obj *model1.AdminQuery) (*buildinfo.Info, error) {
 	build := r.Env.Build()
@@ -97,6 +133,16 @@ func (r *auditLogConnectionResolver) TotalCount(ctx context.Context, obj *model.
 	count, err := r.Env.DBCountAuditLog(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count audit log: %w", err)
+	}
+
+	return count, nil
+}
+
+// TotalCount is the resolver for the totalCount field.
+func (r *mCPKeysConnectionResolver) TotalCount(ctx context.Context, obj *model.MCPKeysConnection) (int64, error) {
+	count, err := r.Env.DBCountMCPKeys(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count MCP keys: %w", err)
 	}
 
 	return count, nil
@@ -183,6 +229,11 @@ func (r *Resolver) AuditLogConnection() generated.AuditLogConnectionResolver {
 	return &auditLogConnectionResolver{r}
 }
 
+// MCPKeysConnection returns generated.MCPKeysConnectionResolver implementation.
+func (r *Resolver) MCPKeysConnection() generated.MCPKeysConnectionResolver {
+	return &mCPKeysConnectionResolver{r}
+}
+
 // Mutation returns generated.MutationResolver implementation.
 func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
 
@@ -203,6 +254,7 @@ type (
 	adminUserResolver          struct{ *Resolver }
 	adminsConnectionResolver   struct{ *Resolver }
 	auditLogConnectionResolver struct{ *Resolver }
+	mCPKeysConnectionResolver  struct{ *Resolver }
 	mutationResolver           struct{ *Resolver }
 	queryResolver              struct{ *Resolver }
 	usersConnectionResolver    struct{ *Resolver }

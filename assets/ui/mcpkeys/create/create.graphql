@@ -1,0 +1,18 @@
+mutation ($input: CreateMCPKeyInput!) {
+	admin {
+		createMCPKey(input: $input) {
+			__typename
+			... on CreateMCPKeyPayload {
+				mcpKeyId
+				key
+			}
+			... on ErrorPayload {
+				message
+				byFields {
+					name
+					value
+				}
+			}
+		}
+	}
+}

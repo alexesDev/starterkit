@@ -16,6 +16,7 @@ traefik ──forwardAuth──▶ oauth2-proxy ──▶ dex          (see trae
   ▼
 cmd/server
   ├── http.go        routes, identity from the gate
+  ├── mcp.go         the MCP route, identity from a key
   ├── auth.go        the identity lookup and the audit writer
   ├── app.go         the app struct — the IO spine
   ├── tx.go          transaction scoping
@@ -26,6 +27,7 @@ cmd/server
         ├── internal/graph      thin resolvers, one line per case
         ├── internal/case/*     the business logic, one package per use case
         ├── internal/notifier   a service object, embedded into app
+        ├── internal/mcpserver  the MCP tools over the same schema
         ├── internal/dbtime     the type every time column binds to
         ├── internal/page       keyset paging: the cursor, the clamp, the probe row
         └── internal/db         sqlc-generated queries, split read/write
@@ -139,11 +141,13 @@ Deliberately, so that the first project built on it adds them knowingly rather
 than inheriting them:
 
 - **No stored credential.** The panel verifies the gate's ID token and holds no
-  session, no client secret and no signing key. Nothing in the schema is a
-  secret, so there is no sealing layer and no `@sensitive` redaction in the
-  audit walker. [graphql.md](graphql.md) says what to add on the day the first
-  secret-bearing mutation arrives.
-- **No REST.** One GraphQL endpoint, plus `/healthz`, `/readyz` and
-  `/settings.js`.
+  session, no client secret and no signing key. MCP keys are stored as SHA-256
+  hashes, which cannot be presented back ([mcp.md](mcp.md)). No mutation input
+  is a secret, so there is no sealing layer and no `@sensitive` redaction in
+  the audit walker. [graphql.md](graphql.md) says what to add on the day the
+  first secret-bearing input arrives.
+- **No REST.** One GraphQL endpoint, plus `/healthz`, `/readyz`,
+  `/settings.js`, and `/mcp`, which serves the same schema to MCP clients
+  ([mcp.md](mcp.md)).
 - **No caching layer.** Identity is one indexed read per request; the metrics
   gauges are the only background reads.

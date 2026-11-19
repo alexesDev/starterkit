@@ -20,6 +20,7 @@ import (
 	"starterkit/internal/cronjobs"
 	"starterkit/internal/db"
 	"starterkit/internal/gateauth"
+	"starterkit/internal/graph"
 	"starterkit/internal/logger"
 	"starterkit/internal/metrics"
 	"starterkit/internal/notifier"
@@ -234,6 +235,7 @@ func newApp(ctx context.Context, config *appconfig.Config, log logger.Logger) (*
 	a.Metrics = metrics.New(a, config.Metrics)
 	a.Notifier = notifier.New(a, config.Notifier)
 	a.Backup = backup.New(conns.Snapshot, config.Backup)
+	a.Executor = graph.NewExecutor(a, graph.Introspection(config.DevMode))
 
 	return a, nil
 }

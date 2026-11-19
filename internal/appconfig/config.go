@@ -19,6 +19,7 @@ import (
 	"starterkit/internal/dbmate/sqlite"
 	"starterkit/internal/gateauth"
 	"starterkit/internal/logger"
+	"starterkit/internal/mcpserver"
 	"starterkit/internal/metrics"
 	"starterkit/internal/notifier"
 	"starterkit/internal/page"
@@ -45,6 +46,7 @@ type Config struct {
 	Notifier notifier.Config
 	Proxies  clientip.Config
 	Metrics  metrics.Config
+	MCP      mcpserver.Config
 	Log      logger.Config
 	Page     page.Limits
 	Shutdown Shutdown
@@ -86,6 +88,7 @@ func Parse(args, environ []string) (*Config, error) {
 	cfg.Notifier.Register(r)
 	cfg.Proxies.Register(r)
 	cfg.Metrics.Register(r)
+	cfg.MCP.Register(r)
 	cfg.Log.Register(r)
 	cfg.Page.Register(r)
 	cfg.Shutdown.Register(r)
@@ -98,6 +101,7 @@ func Parse(args, environ []string) (*Config, error) {
 	cfg.Backup.Check(r)
 	cfg.Notifier.Check(r)
 	cfg.Metrics.Check(r)
+	cfg.MCP.Check(r)
 	cfg.Page.Check(r)
 
 	return cfg, r.Err()

@@ -16,6 +16,7 @@ Why things are the way they are. Start here, in this order.
 | [jobs-and-cron.md](jobs-and-cron.md) | The SQLite-backed queue and the scheduler |
 | [texts.md](texts.md) | What a service says to a person: the typed catalog, plurals, the snapshot, the Cyrillic guard |
 | [auth-dex.md](auth-dex.md) | OIDC through the gate, bans, the audit log, corporate IdPs |
+| [mcp.md](mcp.md) | The MCP endpoint, its keys, replacing them with workload identity, and a service that is its own CLI |
 | [traefik-forward-auth.md](traefik-forward-auth.md) | The gate in front of the panel |
 | [metrics-and-shutdown.md](metrics-and-shutdown.md) | Prometheus, and draining without dropping requests |
 | [behavioural-testing.md](behavioural-testing.md) | Using the audit log and metrics as the test oracle |
@@ -37,4 +38,6 @@ a revoked grant applies to the next one.
 Timestamps are integer unix seconds, `dbtime.Stamp` in Go, and one `Timestamp`
 object type in GraphQL — formatting happens on the server, declared once.
 
-The panel stores no credential. If yours will, decide that on purpose.
+The panel stores no credential a caller could present. MCP keys are kept as
+hashes, and [mcp.md](mcp.md) says how to replace them with no stored secret at
+all. If yours will store one, decide that on purpose.

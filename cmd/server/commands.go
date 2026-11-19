@@ -4,11 +4,15 @@ import (
 	"context"
 
 	"starterkit/internal/case/banuser"
+	"starterkit/internal/case/createmcpkey"
+	"starterkit/internal/case/deletemcpkey"
 	"starterkit/internal/case/listadmins"
 	"starterkit/internal/case/listauditlog"
+	"starterkit/internal/case/listmcpkeys"
 	"starterkit/internal/case/listusers"
 	"starterkit/internal/case/makeadmin"
 	"starterkit/internal/case/removeadmin"
+	"starterkit/internal/case/revokemcpkey"
 	"starterkit/internal/case/unbanuser"
 )
 
@@ -60,4 +64,26 @@ func (a *app) ListUsers(ctx context.Context, input listusers.Input) (*listusers.
 
 func (a *app) ListAdmins(ctx context.Context, input listadmins.Input) (*listadmins.Result, error) {
 	return listadmins.Resolve(ctx, a, input)
+}
+
+func (a *app) ListMCPKeys(ctx context.Context, input listmcpkeys.Input) (*listmcpkeys.Result, error) {
+	return listmcpkeys.Resolve(ctx, a, input)
+}
+
+func (a *app) CreateMCPKey(ctx context.Context, input createmcpkey.Input) (createmcpkey.Payload, error) {
+	return runInTx(ctx, a, func(txCtx context.Context, env *app) (createmcpkey.Payload, error) {
+		return createmcpkey.Resolve(txCtx, env, input)
+	})
+}
+
+func (a *app) RevokeMCPKey(ctx context.Context, input revokemcpkey.Input) (revokemcpkey.Payload, error) {
+	return runInTx(ctx, a, func(txCtx context.Context, env *app) (revokemcpkey.Payload, error) {
+		return revokemcpkey.Resolve(txCtx, env, input)
+	})
+}
+
+func (a *app) DeleteMCPKey(ctx context.Context, input deletemcpkey.Input) (deletemcpkey.Payload, error) {
+	return runInTx(ctx, a, func(txCtx context.Context, env *app) (deletemcpkey.Payload, error) {
+		return deletemcpkey.Resolve(txCtx, env, input)
+	})
 }

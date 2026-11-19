@@ -39,3 +39,20 @@ delete from audit_log where created_at < ?;
 
 -- name: DBMoveJobToQueue :exec
 update goqite set queue = @queue where id = @id;
+
+-- name: DBInsertMCPKey :one
+insert into mcp_keys (user_id, name, key_hash, created_at)
+values (?, ?, ?, ?)
+returning *;
+
+-- name: DBRevokeMCPKey :execrows
+update mcp_keys set revoked_at = ? where id = ? and revoked_at is null;
+
+-- name: DBDeleteMCPKey :execrows
+delete from mcp_keys where id = ?;
+
+-- name: DBMarkMCPKeyUsed :exec
+update mcp_keys
+   set last_used_at = sqlc.arg(used_at)
+ where mcp_keys.id = sqlc.arg(id)
+   and (mcp_keys.last_used_at is null or mcp_keys.last_used_at < sqlc.arg(stale_before));

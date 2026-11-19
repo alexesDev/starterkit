@@ -1,0 +1,18 @@
+query ($id: Int64!) {
+	admin {
+		mcpKey(id: $id) {
+			id
+			name
+			ownerEmail
+			createdAt {
+				formatted(layout: "2006-01-02 15:04")
+			}
+			lastUsedAt {
+				formatted(layout: "2006-01-02 15:04")
+			}
+			revokedAt {
+				formatted(layout: "2006-01-02 15:04")
+			}
+		}
+	}
+}

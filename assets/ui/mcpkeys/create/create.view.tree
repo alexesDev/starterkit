@@ -1,0 +1,30 @@
+$starterkit_mcpkeys_create $mol_page
+	title \New MCP key
+	tools <= actions /
+		<= Create $mol_button_major
+			title \Create
+			click? <=> create? null
+		<= Again $mol_button_minor
+			title \Create another
+			click? <=> again? null
+	body <= form_rows /
+		<= Name_field $mol_form_field
+			name \Name
+			bid <= name_bid \
+			control <= Name $mol_string
+				hint \What will use this key
+				value? <=> name? \
+		<= Status $mol_status
+			message <= message \
+		<= Issued $mol_list
+			rows /
+				<= Secret_field $mol_labeler
+					title \Key - shown once, copy it now
+					content /
+						<= secret \
+				<= Copy $mol_button_copy
+					title \Copy key
+					text <= secret
+				<= Open $mol_link
+					arg <= open_arg *
+					title \Open the key

@@ -38,6 +38,7 @@ type ResolverRoot interface {
 	AdminUser() AdminUserResolver
 	AdminsConnection() AdminsConnectionResolver
 	AuditLogConnection() AuditLogConnectionResolver
+	MCPKeysConnection() MCPKeysConnectionResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 	UsersConnection() UsersConnectionResolver
@@ -59,12 +60,17 @@ type AdminMutationResolver interface {
 	UnbanUser(ctx context.Context, obj *model.AdminMutation, input model1.UnbanUserInput) (model1.UnbanUserOrErrorPayload, error)
 	MakeAdmin(ctx context.Context, obj *model.AdminMutation, input model1.MakeAdminInput) (model1.MakeAdminOrErrorPayload, error)
 	RemoveAdmin(ctx context.Context, obj *model.AdminMutation, input model1.RemoveAdminInput) (model1.RemoveAdminOrErrorPayload, error)
+	CreateMCPKey(ctx context.Context, obj *model.AdminMutation, input model1.CreateMCPKeyInput) (model1.CreateMCPKeyOrErrorPayload, error)
+	RevokeMCPKey(ctx context.Context, obj *model.AdminMutation, input model1.RevokeMCPKeyInput) (model1.RevokeMCPKeyOrErrorPayload, error)
+	DeleteMCPKey(ctx context.Context, obj *model.AdminMutation, input model1.DeleteMCPKeyInput) (model1.DeleteMCPKeyOrErrorPayload, error)
 }
 type AdminQueryResolver interface {
 	Users(ctx context.Context, obj *model.AdminQuery, first *int64, after *page.Cursor) (*model1.UsersConnection, error)
 	User(ctx context.Context, obj *model.AdminQuery, id int64) (*db.DBListUsersRow, error)
 	Admins(ctx context.Context, obj *model.AdminQuery, first *int64, after *page.Cursor) (*model1.AdminsConnection, error)
 	AuditLog(ctx context.Context, obj *model.AdminQuery, first *int64, after *page.Cursor) (*model1.AuditLogConnection, error)
+	MCPKeys(ctx context.Context, obj *model.AdminQuery, first *int64, after *page.Cursor) (*model1.MCPKeysConnection, error)
+	MCPKey(ctx context.Context, obj *model.AdminQuery, id int64) (*db.DBListMCPKeysRow, error)
 	Build(ctx context.Context, obj *model.AdminQuery) (*buildinfo.Info, error)
 }
 type AdminUserResolver interface {
@@ -75,6 +81,9 @@ type AdminsConnectionResolver interface {
 }
 type AuditLogConnectionResolver interface {
 	TotalCount(ctx context.Context, obj *model1.AuditLogConnection) (int64, error)
+}
+type MCPKeysConnectionResolver interface {
+	TotalCount(ctx context.Context, obj *model1.MCPKeysConnection) (int64, error)
 }
 type MutationResolver interface {
 	SignOut(ctx context.Context) (*model1.SignOutPayload, error)
@@ -116,8 +125,11 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputBanUserInput,
+		ec.unmarshalInputCreateMCPKeyInput,
+		ec.unmarshalInputDeleteMCPKeyInput,
 		ec.unmarshalInputMakeAdminInput,
 		ec.unmarshalInputRemoveAdminInput,
+		ec.unmarshalInputRevokeMCPKeyInput,
 		ec.unmarshalInputUnbanUserInput,
 	)
 	first := true
@@ -252,6 +264,8 @@ type AdminQuery @goModel(model: "starterkit/internal/model.AdminQuery") {
   user(id: Int64!): AdminUser
   admins(first: Int64, after: Cursor): AdminsConnection!
   auditLog(first: Int64, after: Cursor): AuditLogConnection!
+  mcpKeys(first: Int64, after: Cursor): MCPKeysConnection!
+  mcpKey(id: Int64!): MCPKey
   build: Build!
 }
 
@@ -266,6 +280,9 @@ type AdminMutation @goModel(model: "starterkit/internal/model.AdminMutation") {
   unbanUser(input: UnbanUserInput!): UnbanUserOrErrorPayload!
   makeAdmin(input: MakeAdminInput!): MakeAdminOrErrorPayload!
   removeAdmin(input: RemoveAdminInput!): RemoveAdminOrErrorPayload!
+  createMCPKey(input: CreateMCPKeyInput!): CreateMCPKeyOrErrorPayload!
+  revokeMCPKey(input: RevokeMCPKeyInput!): RevokeMCPKeyOrErrorPayload!
+  deleteMCPKey(input: DeleteMCPKeyInput!): DeleteMCPKeyOrErrorPayload!
 }
 
 type UsersConnection {
@@ -282,6 +299,21 @@ type AdminUser @goModel(model: "starterkit/internal/db.DBListUsersRow") {
   lastSignInAt: Timestamp
   isAdmin: Boolean! @goField(forceResolver: true)
   banReason: String!
+}
+
+type MCPKeysConnection {
+  totalCount: Int64! @goField(forceResolver: true)
+  nodes: [MCPKey!]!
+  pageInfo: PageInfo!
+}
+
+type MCPKey @goModel(model: "starterkit/internal/db.DBListMCPKeysRow") {
+  id: Int64!
+  name: String!
+  ownerEmail: String!
+  createdAt: Timestamp!
+  lastUsedAt: Timestamp
+  revokedAt: Timestamp
 }
 
 type AdminsConnection {
@@ -368,6 +400,37 @@ type RemoveAdminPayload {
 }
 
 union RemoveAdminOrErrorPayload = RemoveAdminPayload | ErrorPayload
+
+input CreateMCPKeyInput {
+  name: String!
+}
+
+type CreateMCPKeyPayload {
+  mcpKeyId: Int64!
+  key: String!
+}
+
+union CreateMCPKeyOrErrorPayload = CreateMCPKeyPayload | ErrorPayload
+
+input RevokeMCPKeyInput {
+  mcpKeyId: Int64!
+}
+
+type RevokeMCPKeyPayload {
+  mcpKeyId: Int64!
+}
+
+union RevokeMCPKeyOrErrorPayload = RevokeMCPKeyPayload | ErrorPayload
+
+input DeleteMCPKeyInput {
+  mcpKeyId: Int64!
+}
+
+type DeleteMCPKeyPayload {
+  mcpKeyId: Int64!
+}
+
+union DeleteMCPKeyOrErrorPayload = DeleteMCPKeyPayload | ErrorPayload
 `, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -400,6 +463,12 @@ func (ec *executionContext) childFields_AdminMutation(ctx context.Context, field
 		return ec.fieldContext_AdminMutation_makeAdmin(ctx, field)
 	case "removeAdmin":
 		return ec.fieldContext_AdminMutation_removeAdmin(ctx, field)
+	case "createMCPKey":
+		return ec.fieldContext_AdminMutation_createMCPKey(ctx, field)
+	case "revokeMCPKey":
+		return ec.fieldContext_AdminMutation_revokeMCPKey(ctx, field)
+	case "deleteMCPKey":
+		return ec.fieldContext_AdminMutation_deleteMCPKey(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type AdminMutation", field.Name)
 }
@@ -414,6 +483,10 @@ func (ec *executionContext) childFields_AdminQuery(ctx context.Context, field gr
 		return ec.fieldContext_AdminQuery_admins(ctx, field)
 	case "auditLog":
 		return ec.fieldContext_AdminQuery_auditLog(ctx, field)
+	case "mcpKeys":
+		return ec.fieldContext_AdminQuery_mcpKeys(ctx, field)
+	case "mcpKey":
+		return ec.fieldContext_AdminQuery_mcpKey(ctx, field)
 	case "build":
 		return ec.fieldContext_AdminQuery_build(ctx, field)
 	}
@@ -504,6 +577,36 @@ func (ec *executionContext) childFields_FieldMessage(ctx context.Context, field 
 		return ec.fieldContext_FieldMessage_value(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type FieldMessage", field.Name)
+}
+
+func (ec *executionContext) childFields_MCPKey(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_MCPKey_id(ctx, field)
+	case "name":
+		return ec.fieldContext_MCPKey_name(ctx, field)
+	case "ownerEmail":
+		return ec.fieldContext_MCPKey_ownerEmail(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_MCPKey_createdAt(ctx, field)
+	case "lastUsedAt":
+		return ec.fieldContext_MCPKey_lastUsedAt(ctx, field)
+	case "revokedAt":
+		return ec.fieldContext_MCPKey_revokedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type MCPKey", field.Name)
+}
+
+func (ec *executionContext) childFields_MCPKeysConnection(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "totalCount":
+		return ec.fieldContext_MCPKeysConnection_totalCount(ctx, field)
+	case "nodes":
+		return ec.fieldContext_MCPKeysConnection_nodes(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_MCPKeysConnection_pageInfo(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type MCPKeysConnection", field.Name)
 }
 
 func (ec *executionContext) childFields_PageInfo(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -700,6 +803,34 @@ func (ec *executionContext) field_AdminMutation_banUser_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_AdminMutation_createMCPKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model1.CreateMCPKeyInput, error) {
+			return ec.unmarshalNCreateMCPKeyInput2starterkitᚋinternalᚋgraphᚋmodelᚐCreateMCPKeyInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_AdminMutation_deleteMCPKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model1.DeleteMCPKeyInput, error) {
+			return ec.unmarshalNDeleteMCPKeyInput2starterkitᚋinternalᚋgraphᚋmodelᚐDeleteMCPKeyInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_AdminMutation_makeAdmin_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -720,6 +851,20 @@ func (ec *executionContext) field_AdminMutation_removeAdmin_args(ctx context.Con
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (model1.RemoveAdminInput, error) {
 			return ec.unmarshalNRemoveAdminInput2starterkitᚋinternalᚋgraphᚋmodelᚐRemoveAdminInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_AdminMutation_revokeMCPKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model1.RevokeMCPKeyInput, error) {
+			return ec.unmarshalNRevokeMCPKeyInput2starterkitᚋinternalᚋgraphᚋmodelᚐRevokeMCPKeyInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -765,6 +910,42 @@ func (ec *executionContext) field_AdminQuery_admins_args(ctx context.Context, ra
 }
 
 func (ec *executionContext) field_AdminQuery_auditLog_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (*int64, error) {
+			return ec.unmarshalOInt642ᚖint64(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*page.Cursor, error) {
+			return ec.unmarshalOCursor2ᚖstarterkitᚋinternalᚋpageᚐCursor(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_AdminQuery_mcpKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (int64, error) {
+			return ec.unmarshalNInt642int64(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_AdminQuery_mcpKeys_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
@@ -1187,6 +1368,138 @@ func (ec *executionContext) fieldContext_AdminMutation_removeAdmin(ctx context.C
 	return fc, nil
 }
 
+func (ec *executionContext) _AdminMutation_createMCPKey(ctx context.Context, field graphql.CollectedField, obj *model.AdminMutation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AdminMutation_createMCPKey(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.AdminMutation().CreateMCPKey(ctx, obj, fc.Args["input"].(model1.CreateMCPKeyInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model1.CreateMCPKeyOrErrorPayload) graphql.Marshaler {
+			return ec.marshalNCreateMCPKeyOrErrorPayload2starterkitᚋinternalᚋgraphᚋmodelᚐCreateMCPKeyOrErrorPayload(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AdminMutation_createMCPKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminMutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CreateMCPKeyOrErrorPayload does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_AdminMutation_createMCPKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminMutation_revokeMCPKey(ctx context.Context, field graphql.CollectedField, obj *model.AdminMutation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AdminMutation_revokeMCPKey(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.AdminMutation().RevokeMCPKey(ctx, obj, fc.Args["input"].(model1.RevokeMCPKeyInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model1.RevokeMCPKeyOrErrorPayload) graphql.Marshaler {
+			return ec.marshalNRevokeMCPKeyOrErrorPayload2starterkitᚋinternalᚋgraphᚋmodelᚐRevokeMCPKeyOrErrorPayload(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AdminMutation_revokeMCPKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminMutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type RevokeMCPKeyOrErrorPayload does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_AdminMutation_revokeMCPKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminMutation_deleteMCPKey(ctx context.Context, field graphql.CollectedField, obj *model.AdminMutation) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AdminMutation_deleteMCPKey(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.AdminMutation().DeleteMCPKey(ctx, obj, fc.Args["input"].(model1.DeleteMCPKeyInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model1.DeleteMCPKeyOrErrorPayload) graphql.Marshaler {
+			return ec.marshalNDeleteMCPKeyOrErrorPayload2starterkitᚋinternalᚋgraphᚋmodelᚐDeleteMCPKeyOrErrorPayload(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AdminMutation_deleteMCPKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminMutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DeleteMCPKeyOrErrorPayload does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_AdminMutation_deleteMCPKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _AdminQuery_users(ctx context.Context, field graphql.CollectedField, obj *model.AdminQuery) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1357,6 +1670,94 @@ func (ec *executionContext) fieldContext_AdminQuery_auditLog(ctx context.Context
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_AdminQuery_auditLog_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminQuery_mcpKeys(ctx context.Context, field graphql.CollectedField, obj *model.AdminQuery) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AdminQuery_mcpKeys(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.AdminQuery().MCPKeys(ctx, obj, fc.Args["first"].(*int64), fc.Args["after"].(*page.Cursor))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model1.MCPKeysConnection) graphql.Marshaler {
+			return ec.marshalNMCPKeysConnection2ᚖstarterkitᚋinternalᚋgraphᚋmodelᚐMCPKeysConnection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AdminQuery_mcpKeys(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminQuery",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MCPKeysConnection(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_AdminQuery_mcpKeys_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AdminQuery_mcpKey(ctx context.Context, field graphql.CollectedField, obj *model.AdminQuery) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AdminQuery_mcpKey(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.AdminQuery().MCPKey(ctx, obj, fc.Args["id"].(int64))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *db.DBListMCPKeysRow) graphql.Marshaler {
+			return ec.marshalOMCPKey2ᚖstarterkitᚋinternalᚋdbᚐDBListMCPKeysRow(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_AdminQuery_mcpKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AdminQuery",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MCPKey(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_AdminQuery_mcpKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2019,6 +2420,75 @@ func (ec *executionContext) fieldContext_Build_commitUrl(_ context.Context, fiel
 	return graphql.NewScalarFieldContext("Build", field, true, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _CreateMCPKeyPayload_mcpKeyId(ctx context.Context, field graphql.CollectedField, obj *model1.CreateMCPKeyPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CreateMCPKeyPayload_mcpKeyId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MCPKeyID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int64) graphql.Marshaler {
+			return ec.marshalNInt642int64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CreateMCPKeyPayload_mcpKeyId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CreateMCPKeyPayload", field, false, false, errors.New("field of type Int64 does not have child fields"))
+}
+
+func (ec *executionContext) _CreateMCPKeyPayload_key(ctx context.Context, field graphql.CollectedField, obj *model1.CreateMCPKeyPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CreateMCPKeyPayload_key(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CreateMCPKeyPayload_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CreateMCPKeyPayload", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _DeleteMCPKeyPayload_mcpKeyId(ctx context.Context, field graphql.CollectedField, obj *model1.DeleteMCPKeyPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeleteMCPKeyPayload_mcpKeyId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MCPKeyID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int64) graphql.Marshaler {
+			return ec.marshalNInt642int64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeleteMCPKeyPayload_mcpKeyId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeleteMCPKeyPayload", field, false, false, errors.New("field of type Int64 does not have child fields"))
+}
+
 func (ec *executionContext) _ErrorPayload_message(ctx context.Context, field graphql.CollectedField, obj *model1.ErrorPayload) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2118,6 +2588,258 @@ func (ec *executionContext) _FieldMessage_value(ctx context.Context, field graph
 }
 func (ec *executionContext) fieldContext_FieldMessage_value(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("FieldMessage", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _MCPKey_id(ctx context.Context, field graphql.CollectedField, obj *db.DBListMCPKeysRow) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKey_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int64) graphql.Marshaler {
+			return ec.marshalNInt642int64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKey_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MCPKey", field, false, false, errors.New("field of type Int64 does not have child fields"))
+}
+
+func (ec *executionContext) _MCPKey_name(ctx context.Context, field graphql.CollectedField, obj *db.DBListMCPKeysRow) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKey_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKey_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MCPKey", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _MCPKey_ownerEmail(ctx context.Context, field graphql.CollectedField, obj *db.DBListMCPKeysRow) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKey_ownerEmail(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.OwnerEmail, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKey_ownerEmail(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MCPKey", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _MCPKey_createdAt(ctx context.Context, field graphql.CollectedField, obj *db.DBListMCPKeysRow) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKey_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v dbtime.Stamp) graphql.Marshaler {
+			return ec.marshalNTimestamp2starterkitᚋinternalᚋdbtimeᚐStamp(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKey_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MCPKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Timestamp(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MCPKey_lastUsedAt(ctx context.Context, field graphql.CollectedField, obj *db.DBListMCPKeysRow) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKey_lastUsedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastUsedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *dbtime.Stamp) graphql.Marshaler {
+			return ec.marshalOTimestamp2ᚖstarterkitᚋinternalᚋdbtimeᚐStamp(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKey_lastUsedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MCPKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Timestamp(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MCPKey_revokedAt(ctx context.Context, field graphql.CollectedField, obj *db.DBListMCPKeysRow) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKey_revokedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RevokedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *dbtime.Stamp) graphql.Marshaler {
+			return ec.marshalOTimestamp2ᚖstarterkitᚋinternalᚋdbtimeᚐStamp(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKey_revokedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MCPKey",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Timestamp(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MCPKeysConnection_totalCount(ctx context.Context, field graphql.CollectedField, obj *model1.MCPKeysConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKeysConnection_totalCount(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return ec.Resolvers.MCPKeysConnection().TotalCount(ctx, obj)
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int64) graphql.Marshaler {
+			return ec.marshalNInt642int64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKeysConnection_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("MCPKeysConnection", field, true, true, errors.New("field of type Int64 does not have child fields"))
+}
+
+func (ec *executionContext) _MCPKeysConnection_nodes(ctx context.Context, field graphql.CollectedField, obj *model1.MCPKeysConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKeysConnection_nodes(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Nodes, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []db.DBListMCPKeysRow) graphql.Marshaler {
+			return ec.marshalNMCPKey2ᚕstarterkitᚋinternalᚋdbᚐDBListMCPKeysRowᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKeysConnection_nodes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MCPKeysConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_MCPKey(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MCPKeysConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model1.MCPKeysConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_MCPKeysConnection_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *page.Info) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖstarterkitᚋinternalᚋpageᚐInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_MCPKeysConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MCPKeysConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _MakeAdminPayload_userId(ctx context.Context, field graphql.CollectedField, obj *model1.MakeAdminPayload) (ret graphql.Marshaler) {
@@ -2414,6 +3136,29 @@ func (ec *executionContext) _RemoveAdminPayload_userId(ctx context.Context, fiel
 }
 func (ec *executionContext) fieldContext_RemoveAdminPayload_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("RemoveAdminPayload", field, false, false, errors.New("field of type Int64 does not have child fields"))
+}
+
+func (ec *executionContext) _RevokeMCPKeyPayload_mcpKeyId(ctx context.Context, field graphql.CollectedField, obj *model1.RevokeMCPKeyPayload) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_RevokeMCPKeyPayload_mcpKeyId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MCPKeyID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int64) graphql.Marshaler {
+			return ec.marshalNInt642int64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_RevokeMCPKeyPayload_mcpKeyId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("RevokeMCPKeyPayload", field, false, false, errors.New("field of type Int64 does not have child fields"))
 }
 
 func (ec *executionContext) _SignOutPayload_redirectUrl(ctx context.Context, field graphql.CollectedField, obj *model1.SignOutPayload) (ret graphql.Marshaler) {
@@ -3868,6 +4613,66 @@ func (ec *executionContext) unmarshalInputBanUserInput(ctx context.Context, obj 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreateMCPKeyInput(ctx context.Context, obj any) (model1.CreateMCPKeyInput, error) {
+	var it model1.CreateMCPKeyInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"name"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputDeleteMCPKeyInput(ctx context.Context, obj any) (model1.DeleteMCPKeyInput, error) {
+	var it model1.DeleteMCPKeyInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"mcpKeyId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "mcpKeyId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mcpKeyId"))
+			data, err := ec.unmarshalNInt642int64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MCPKeyID = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputMakeAdminInput(ctx context.Context, obj any) (model1.MakeAdminInput, error) {
 	var it model1.MakeAdminInput
 	if obj == nil {
@@ -3923,6 +4728,36 @@ func (ec *executionContext) unmarshalInputRemoveAdminInput(ctx context.Context, 
 				return it, err
 			}
 			it.UserID = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputRevokeMCPKeyInput(ctx context.Context, obj any) (model1.RevokeMCPKeyInput, error) {
+	var it model1.RevokeMCPKeyInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"mcpKeyId"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "mcpKeyId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mcpKeyId"))
+			data, err := ec.unmarshalNInt642int64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MCPKeyID = data
 		}
 	}
 	return it, nil
@@ -3989,6 +4824,60 @@ func (ec *executionContext) _BanUserOrErrorPayload(ctx context.Context, sel ast.
 	}
 }
 
+func (ec *executionContext) _CreateMCPKeyOrErrorPayload(ctx context.Context, sel ast.SelectionSet, obj model1.CreateMCPKeyOrErrorPayload) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model1.ErrorPayload:
+		return ec._ErrorPayload(ctx, sel, &obj)
+	case *model1.ErrorPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrorPayload(ctx, sel, obj)
+	case model1.CreateMCPKeyPayload:
+		return ec._CreateMCPKeyPayload(ctx, sel, &obj)
+	case *model1.CreateMCPKeyPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._CreateMCPKeyPayload(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of CreateMCPKeyOrErrorPayload must implement graphql.Marshaler", obj))
+		}
+	}
+}
+
+func (ec *executionContext) _DeleteMCPKeyOrErrorPayload(ctx context.Context, sel ast.SelectionSet, obj model1.DeleteMCPKeyOrErrorPayload) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model1.ErrorPayload:
+		return ec._ErrorPayload(ctx, sel, &obj)
+	case *model1.ErrorPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrorPayload(ctx, sel, obj)
+	case model1.DeleteMCPKeyPayload:
+		return ec._DeleteMCPKeyPayload(ctx, sel, &obj)
+	case *model1.DeleteMCPKeyPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._DeleteMCPKeyPayload(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of DeleteMCPKeyOrErrorPayload must implement graphql.Marshaler", obj))
+		}
+	}
+}
+
 func (ec *executionContext) _MakeAdminOrErrorPayload(ctx context.Context, sel ast.SelectionSet, obj model1.MakeAdminOrErrorPayload) graphql.Marshaler {
 	switch obj := (obj).(type) {
 	case nil:
@@ -4039,6 +4928,33 @@ func (ec *executionContext) _RemoveAdminOrErrorPayload(ctx context.Context, sel 
 			return typedObj
 		} else {
 			panic(fmt.Errorf("unexpected type %T; non-generated variants of RemoveAdminOrErrorPayload must implement graphql.Marshaler", obj))
+		}
+	}
+}
+
+func (ec *executionContext) _RevokeMCPKeyOrErrorPayload(ctx context.Context, sel ast.SelectionSet, obj model1.RevokeMCPKeyOrErrorPayload) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model1.RevokeMCPKeyPayload:
+		return ec._RevokeMCPKeyPayload(ctx, sel, &obj)
+	case *model1.RevokeMCPKeyPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._RevokeMCPKeyPayload(ctx, sel, obj)
+	case model1.ErrorPayload:
+		return ec._ErrorPayload(ctx, sel, &obj)
+	case *model1.ErrorPayload:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ErrorPayload(ctx, sel, obj)
+	default:
+		if typedObj, ok := obj.(graphql.Marshaler); ok {
+			return typedObj
+		} else {
+			panic(fmt.Errorf("unexpected type %T; non-generated variants of RevokeMCPKeyOrErrorPayload must implement graphql.Marshaler", obj))
 		}
 	}
 }
@@ -4291,6 +5207,120 @@ func (ec *executionContext) _AdminMutation(ctx context.Context, sel ast.Selectio
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "createMCPKey":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdminMutation_createMCPKey(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "revokeMCPKey":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdminMutation_revokeMCPKey(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "deleteMCPKey":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdminMutation_deleteMCPKey(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4449,6 +5479,82 @@ func (ec *executionContext) _AdminQuery(ctx context.Context, sel ast.SelectionSe
 				}()
 				res = ec._AdminQuery_auditLog(ctx, field, obj)
 				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "mcpKeys":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdminQuery_mcpKeys(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "mcpKey":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._AdminQuery_mcpKey(ctx, field, obj)
+				if res == graphql.RequiredNull {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
@@ -4952,7 +6058,88 @@ func (ec *executionContext) _Build(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
-var errorPayloadImplementors = []string{"ErrorPayload", "BanUserOrErrorPayload", "UnbanUserOrErrorPayload", "MakeAdminOrErrorPayload", "RemoveAdminOrErrorPayload"}
+var createMCPKeyPayloadImplementors = []string{"CreateMCPKeyPayload", "CreateMCPKeyOrErrorPayload"}
+
+func (ec *executionContext) _CreateMCPKeyPayload(ctx context.Context, sel ast.SelectionSet, obj *model1.CreateMCPKeyPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, createMCPKeyPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CreateMCPKeyPayload")
+		case "mcpKeyId":
+			out.Values[i] = ec._CreateMCPKeyPayload_mcpKeyId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "key":
+			out.Values[i] = ec._CreateMCPKeyPayload_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var deleteMCPKeyPayloadImplementors = []string{"DeleteMCPKeyPayload", "DeleteMCPKeyOrErrorPayload"}
+
+func (ec *executionContext) _DeleteMCPKeyPayload(ctx context.Context, sel ast.SelectionSet, obj *model1.DeleteMCPKeyPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deleteMCPKeyPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeleteMCPKeyPayload")
+		case "mcpKeyId":
+			out.Values[i] = ec._DeleteMCPKeyPayload_mcpKeyId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var errorPayloadImplementors = []string{"ErrorPayload", "BanUserOrErrorPayload", "UnbanUserOrErrorPayload", "MakeAdminOrErrorPayload", "RemoveAdminOrErrorPayload", "CreateMCPKeyOrErrorPayload", "RevokeMCPKeyOrErrorPayload", "DeleteMCPKeyOrErrorPayload"}
 
 func (ec *executionContext) _ErrorPayload(ctx context.Context, sel ast.SelectionSet, obj *model1.ErrorPayload) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, errorPayloadImplementors)
@@ -5016,6 +6203,150 @@ func (ec *executionContext) _FieldMessage(ctx context.Context, sel ast.Selection
 			out.Values[i] = ec._FieldMessage_value(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var mCPKeyImplementors = []string{"MCPKey"}
+
+func (ec *executionContext) _MCPKey(ctx context.Context, sel ast.SelectionSet, obj *db.DBListMCPKeysRow) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mCPKeyImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MCPKey")
+		case "id":
+			out.Values[i] = ec._MCPKey_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._MCPKey_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ownerEmail":
+			out.Values[i] = ec._MCPKey_ownerEmail(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._MCPKey_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastUsedAt":
+			out.Values[i] = ec._MCPKey_lastUsedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "revokedAt":
+			out.Values[i] = ec._MCPKey_revokedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var mCPKeysConnectionImplementors = []string{"MCPKeysConnection"}
+
+func (ec *executionContext) _MCPKeysConnection(ctx context.Context, sel ast.SelectionSet, obj *model1.MCPKeysConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mCPKeysConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MCPKeysConnection")
+		case "totalCount":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MCPKeysConnection_totalCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.IsDeferred() {
+				deferredFieldSet.AddField(field)
+				fieldIndex := len(deferredFieldSet.Values) - 1
+				deferredFieldSet.Concurrently(fieldIndex, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, deferredFieldSet)
+				})
+
+				for _, deferrable := range field.Deferrables {
+					view, ok := deferLabelToView[deferrable.Label]
+					if !ok {
+						view = deferredFieldSet.NewView()
+						deferLabelToView[deferrable.Label] = view
+					}
+					view.AddIndices(fieldIndex)
+				}
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		case "nodes":
+			out.Values[i] = ec._MCPKeysConnection_nodes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "pageInfo":
+			out.Values[i] = ec._MCPKeysConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -5287,6 +6618,44 @@ func (ec *executionContext) _RemoveAdminPayload(ctx context.Context, sel ast.Sel
 			out.Values[i] = graphql.MarshalString("RemoveAdminPayload")
 		case "userId":
 			out.Values[i] = ec._RemoveAdminPayload_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var revokeMCPKeyPayloadImplementors = []string{"RevokeMCPKeyPayload", "RevokeMCPKeyOrErrorPayload"}
+
+func (ec *executionContext) _RevokeMCPKeyPayload(ctx context.Context, sel ast.SelectionSet, obj *model1.RevokeMCPKeyPayload) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, revokeMCPKeyPayloadImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RevokeMCPKeyPayload")
+		case "mcpKeyId":
+			out.Values[i] = ec._RevokeMCPKeyPayload_mcpKeyId(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -6226,6 +7595,36 @@ func (ec *executionContext) marshalNBuild2ᚖstarterkitᚋinternalᚋbuildinfo�
 	return ec._Build(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNCreateMCPKeyInput2starterkitᚋinternalᚋgraphᚋmodelᚐCreateMCPKeyInput(ctx context.Context, v any) (model1.CreateMCPKeyInput, error) {
+	res, err := ec.unmarshalInputCreateMCPKeyInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCreateMCPKeyOrErrorPayload2starterkitᚋinternalᚋgraphᚋmodelᚐCreateMCPKeyOrErrorPayload(ctx context.Context, sel ast.SelectionSet, v model1.CreateMCPKeyOrErrorPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CreateMCPKeyOrErrorPayload(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNDeleteMCPKeyInput2starterkitᚋinternalᚋgraphᚋmodelᚐDeleteMCPKeyInput(ctx context.Context, v any) (model1.DeleteMCPKeyInput, error) {
+	res, err := ec.unmarshalInputDeleteMCPKeyInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNDeleteMCPKeyOrErrorPayload2starterkitᚋinternalᚋgraphᚋmodelᚐDeleteMCPKeyOrErrorPayload(ctx context.Context, sel ast.SelectionSet, v model1.DeleteMCPKeyOrErrorPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeleteMCPKeyOrErrorPayload(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNFieldMessage2starterkitᚋinternalᚋgraphᚋmodelᚐFieldMessage(ctx context.Context, sel ast.SelectionSet, v model1.FieldMessage) graphql.Marshaler {
 	return ec._FieldMessage(ctx, sel, &v)
 }
@@ -6260,6 +7659,40 @@ func (ec *executionContext) marshalNInt642int64(ctx context.Context, sel ast.Sel
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNMCPKey2starterkitᚋinternalᚋdbᚐDBListMCPKeysRow(ctx context.Context, sel ast.SelectionSet, v db.DBListMCPKeysRow) graphql.Marshaler {
+	return ec._MCPKey(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMCPKey2ᚕstarterkitᚋinternalᚋdbᚐDBListMCPKeysRowᚄ(ctx context.Context, sel ast.SelectionSet, v []db.DBListMCPKeysRow) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNMCPKey2starterkitᚋinternalᚋdbᚐDBListMCPKeysRow(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNMCPKeysConnection2starterkitᚋinternalᚋgraphᚋmodelᚐMCPKeysConnection(ctx context.Context, sel ast.SelectionSet, v model1.MCPKeysConnection) graphql.Marshaler {
+	return ec._MCPKeysConnection(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMCPKeysConnection2ᚖstarterkitᚋinternalᚋgraphᚋmodelᚐMCPKeysConnection(ctx context.Context, sel ast.SelectionSet, v *model1.MCPKeysConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MCPKeysConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNMakeAdminInput2starterkitᚋinternalᚋgraphᚋmodelᚐMakeAdminInput(ctx context.Context, v any) (model1.MakeAdminInput, error) {
@@ -6300,6 +7733,21 @@ func (ec *executionContext) marshalNRemoveAdminOrErrorPayload2starterkitᚋinter
 		return graphql.Null
 	}
 	return ec._RemoveAdminOrErrorPayload(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNRevokeMCPKeyInput2starterkitᚋinternalᚋgraphᚋmodelᚐRevokeMCPKeyInput(ctx context.Context, v any) (model1.RevokeMCPKeyInput, error) {
+	res, err := ec.unmarshalInputRevokeMCPKeyInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNRevokeMCPKeyOrErrorPayload2starterkitᚋinternalᚋgraphᚋmodelᚐRevokeMCPKeyOrErrorPayload(ctx context.Context, sel ast.SelectionSet, v model1.RevokeMCPKeyOrErrorPayload) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RevokeMCPKeyOrErrorPayload(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNSignOutPayload2starterkitᚋinternalᚋgraphᚋmodelᚐSignOutPayload(ctx context.Context, sel ast.SelectionSet, v model1.SignOutPayload) graphql.Marshaler {
@@ -6598,6 +8046,13 @@ func (ec *executionContext) marshalOInt642ᚖint64(ctx context.Context, sel ast.
 	_ = ctx
 	res := graphql.MarshalInt64(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOMCPKey2ᚖstarterkitᚋinternalᚋdbᚐDBListMCPKeysRow(ctx context.Context, sel ast.SelectionSet, v *db.DBListMCPKeysRow) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MCPKey(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {

@@ -8,11 +8,15 @@ import (
 	"starterkit/internal/audit"
 	"starterkit/internal/buildinfo"
 	"starterkit/internal/case/banuser"
+	"starterkit/internal/case/createmcpkey"
+	"starterkit/internal/case/deletemcpkey"
 	"starterkit/internal/case/listadmins"
 	"starterkit/internal/case/listauditlog"
+	"starterkit/internal/case/listmcpkeys"
 	"starterkit/internal/case/listusers"
 	"starterkit/internal/case/makeadmin"
 	"starterkit/internal/case/removeadmin"
+	"starterkit/internal/case/revokemcpkey"
 	"starterkit/internal/case/unbanuser"
 	"starterkit/internal/db"
 	"starterkit/internal/graph"
@@ -37,6 +41,9 @@ var _ graph.Env = &EnvMock{}
 //			BuildFunc: func() buildinfo.Info {
 //				panic("mock out the Build method")
 //			},
+//			CreateMCPKeyFunc: func(ctx context.Context, input createmcpkey.Input) (createmcpkey.Payload, error) {
+//				panic("mock out the CreateMCPKey method")
+//			},
 //			CurrentAdminFunc: func(ctx context.Context) (int64, error) {
 //				panic("mock out the CurrentAdmin method")
 //			},
@@ -52,17 +59,29 @@ var _ graph.Env = &EnvMock{}
 //			DBCountAuditLogFunc: func(ctx context.Context) (int64, error) {
 //				panic("mock out the DBCountAuditLog method")
 //			},
+//			DBCountMCPKeysFunc: func(ctx context.Context) (int64, error) {
+//				panic("mock out the DBCountMCPKeys method")
+//			},
 //			DBCountUsersFunc: func(ctx context.Context) (int64, error) {
 //				panic("mock out the DBCountUsers method")
 //			},
 //			DBGetAdminUserByIDFunc: func(ctx context.Context, id int64) (db.DBGetAdminUserByIDRow, error) {
 //				panic("mock out the DBGetAdminUserByID method")
 //			},
+//			DBGetMCPKeyByIDFunc: func(ctx context.Context, id int64) (db.DBGetMCPKeyByIDRow, error) {
+//				panic("mock out the DBGetMCPKeyByID method")
+//			},
+//			DeleteMCPKeyFunc: func(ctx context.Context, input deletemcpkey.Input) (deletemcpkey.Payload, error) {
+//				panic("mock out the DeleteMCPKey method")
+//			},
 //			ListAdminsFunc: func(ctx context.Context, input listadmins.Input) (*listadmins.Result, error) {
 //				panic("mock out the ListAdmins method")
 //			},
 //			ListAuditLogFunc: func(ctx context.Context, input listauditlog.Input) (*listauditlog.Result, error) {
 //				panic("mock out the ListAuditLog method")
+//			},
+//			ListMCPKeysFunc: func(ctx context.Context, input listmcpkeys.Input) (*listmcpkeys.Result, error) {
+//				panic("mock out the ListMCPKeys method")
 //			},
 //			ListUsersFunc: func(ctx context.Context, input listusers.Input) (*listusers.Result, error) {
 //				panic("mock out the ListUsers method")
@@ -84,6 +103,9 @@ var _ graph.Env = &EnvMock{}
 //			},
 //			RemoveAdminFunc: func(ctx context.Context, input removeadmin.Input) (removeadmin.Payload, error) {
 //				panic("mock out the RemoveAdmin method")
+//			},
+//			RevokeMCPKeyFunc: func(ctx context.Context, input revokemcpkey.Input) (revokemcpkey.Payload, error) {
+//				panic("mock out the RevokeMCPKey method")
 //			},
 //			SignOutURLFunc: func() string {
 //				panic("mock out the SignOutURL method")
@@ -107,6 +129,9 @@ type EnvMock struct {
 	// BuildFunc mocks the Build method.
 	BuildFunc func() buildinfo.Info
 
+	// CreateMCPKeyFunc mocks the CreateMCPKey method.
+	CreateMCPKeyFunc func(ctx context.Context, input createmcpkey.Input) (createmcpkey.Payload, error)
+
 	// CurrentAdminFunc mocks the CurrentAdmin method.
 	CurrentAdminFunc func(ctx context.Context) (int64, error)
 
@@ -122,17 +147,29 @@ type EnvMock struct {
 	// DBCountAuditLogFunc mocks the DBCountAuditLog method.
 	DBCountAuditLogFunc func(ctx context.Context) (int64, error)
 
+	// DBCountMCPKeysFunc mocks the DBCountMCPKeys method.
+	DBCountMCPKeysFunc func(ctx context.Context) (int64, error)
+
 	// DBCountUsersFunc mocks the DBCountUsers method.
 	DBCountUsersFunc func(ctx context.Context) (int64, error)
 
 	// DBGetAdminUserByIDFunc mocks the DBGetAdminUserByID method.
 	DBGetAdminUserByIDFunc func(ctx context.Context, id int64) (db.DBGetAdminUserByIDRow, error)
 
+	// DBGetMCPKeyByIDFunc mocks the DBGetMCPKeyByID method.
+	DBGetMCPKeyByIDFunc func(ctx context.Context, id int64) (db.DBGetMCPKeyByIDRow, error)
+
+	// DeleteMCPKeyFunc mocks the DeleteMCPKey method.
+	DeleteMCPKeyFunc func(ctx context.Context, input deletemcpkey.Input) (deletemcpkey.Payload, error)
+
 	// ListAdminsFunc mocks the ListAdmins method.
 	ListAdminsFunc func(ctx context.Context, input listadmins.Input) (*listadmins.Result, error)
 
 	// ListAuditLogFunc mocks the ListAuditLog method.
 	ListAuditLogFunc func(ctx context.Context, input listauditlog.Input) (*listauditlog.Result, error)
+
+	// ListMCPKeysFunc mocks the ListMCPKeys method.
+	ListMCPKeysFunc func(ctx context.Context, input listmcpkeys.Input) (*listmcpkeys.Result, error)
 
 	// ListUsersFunc mocks the ListUsers method.
 	ListUsersFunc func(ctx context.Context, input listusers.Input) (*listusers.Result, error)
@@ -155,6 +192,9 @@ type EnvMock struct {
 	// RemoveAdminFunc mocks the RemoveAdmin method.
 	RemoveAdminFunc func(ctx context.Context, input removeadmin.Input) (removeadmin.Payload, error)
 
+	// RevokeMCPKeyFunc mocks the RevokeMCPKey method.
+	RevokeMCPKeyFunc func(ctx context.Context, input revokemcpkey.Input) (revokemcpkey.Payload, error)
+
 	// SignOutURLFunc mocks the SignOutURL method.
 	SignOutURLFunc func() string
 
@@ -175,6 +215,13 @@ type EnvMock struct {
 		}
 		// Build holds details about calls to the Build method.
 		Build []struct {
+		}
+		// CreateMCPKey holds details about calls to the CreateMCPKey method.
+		CreateMCPKey []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input createmcpkey.Input
 		}
 		// CurrentAdmin holds details about calls to the CurrentAdmin method.
 		CurrentAdmin []struct {
@@ -201,6 +248,11 @@ type EnvMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// DBCountMCPKeys holds details about calls to the DBCountMCPKeys method.
+		DBCountMCPKeys []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 		// DBCountUsers holds details about calls to the DBCountUsers method.
 		DBCountUsers []struct {
 			// Ctx is the ctx argument value.
@@ -212,6 +264,20 @@ type EnvMock struct {
 			Ctx context.Context
 			// ID is the id argument value.
 			ID int64
+		}
+		// DBGetMCPKeyByID holds details about calls to the DBGetMCPKeyByID method.
+		DBGetMCPKeyByID []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// ID is the id argument value.
+			ID int64
+		}
+		// DeleteMCPKey holds details about calls to the DeleteMCPKey method.
+		DeleteMCPKey []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input deletemcpkey.Input
 		}
 		// ListAdmins holds details about calls to the ListAdmins method.
 		ListAdmins []struct {
@@ -226,6 +292,13 @@ type EnvMock struct {
 			Ctx context.Context
 			// Input is the input argument value.
 			Input listauditlog.Input
+		}
+		// ListMCPKeys holds details about calls to the ListMCPKeys method.
+		ListMCPKeys []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input listmcpkeys.Input
 		}
 		// ListUsers holds details about calls to the ListUsers method.
 		ListUsers []struct {
@@ -266,6 +339,13 @@ type EnvMock struct {
 			// Input is the input argument value.
 			Input removeadmin.Input
 		}
+		// RevokeMCPKey holds details about calls to the RevokeMCPKey method.
+		RevokeMCPKey []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Input is the input argument value.
+			Input revokemcpkey.Input
+		}
 		// SignOutURL holds details about calls to the SignOutURL method.
 		SignOutURL []struct {
 		}
@@ -286,15 +366,20 @@ type EnvMock struct {
 	}
 	lockBanUser                    sync.RWMutex
 	lockBuild                      sync.RWMutex
+	lockCreateMCPKey               sync.RWMutex
 	lockCurrentAdmin               sync.RWMutex
 	lockCurrentUser                sync.RWMutex
 	lockCurrentUserID              sync.RWMutex
 	lockDBCountAdmins              sync.RWMutex
 	lockDBCountAuditLog            sync.RWMutex
+	lockDBCountMCPKeys             sync.RWMutex
 	lockDBCountUsers               sync.RWMutex
 	lockDBGetAdminUserByID         sync.RWMutex
+	lockDBGetMCPKeyByID            sync.RWMutex
+	lockDeleteMCPKey               sync.RWMutex
 	lockListAdmins                 sync.RWMutex
 	lockListAuditLog               sync.RWMutex
+	lockListMCPKeys                sync.RWMutex
 	lockListUsers                  sync.RWMutex
 	lockLogger                     sync.RWMutex
 	lockMakeAdmin                  sync.RWMutex
@@ -302,6 +387,7 @@ type EnvMock struct {
 	lockNow                        sync.RWMutex
 	lockRecordSignOut              sync.RWMutex
 	lockRemoveAdmin                sync.RWMutex
+	lockRevokeMCPKey               sync.RWMutex
 	lockSignOutURL                 sync.RWMutex
 	lockUnbanUser                  sync.RWMutex
 	lockWriteAudit                 sync.RWMutex
@@ -367,6 +453,42 @@ func (mock *EnvMock) BuildCalls() []struct {
 	mock.lockBuild.RLock()
 	calls = mock.calls.Build
 	mock.lockBuild.RUnlock()
+	return calls
+}
+
+// CreateMCPKey calls CreateMCPKeyFunc.
+func (mock *EnvMock) CreateMCPKey(ctx context.Context, input createmcpkey.Input) (createmcpkey.Payload, error) {
+	if mock.CreateMCPKeyFunc == nil {
+		panic("EnvMock.CreateMCPKeyFunc: method is nil but Env.CreateMCPKey was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Input createmcpkey.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockCreateMCPKey.Lock()
+	mock.calls.CreateMCPKey = append(mock.calls.CreateMCPKey, callInfo)
+	mock.lockCreateMCPKey.Unlock()
+	return mock.CreateMCPKeyFunc(ctx, input)
+}
+
+// CreateMCPKeyCalls gets all the calls that were made to CreateMCPKey.
+// Check the length with:
+//
+//	len(mockedEnv.CreateMCPKeyCalls())
+func (mock *EnvMock) CreateMCPKeyCalls() []struct {
+	Ctx   context.Context
+	Input createmcpkey.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input createmcpkey.Input
+	}
+	mock.lockCreateMCPKey.RLock()
+	calls = mock.calls.CreateMCPKey
+	mock.lockCreateMCPKey.RUnlock()
 	return calls
 }
 
@@ -530,6 +652,38 @@ func (mock *EnvMock) DBCountAuditLogCalls() []struct {
 	return calls
 }
 
+// DBCountMCPKeys calls DBCountMCPKeysFunc.
+func (mock *EnvMock) DBCountMCPKeys(ctx context.Context) (int64, error) {
+	if mock.DBCountMCPKeysFunc == nil {
+		panic("EnvMock.DBCountMCPKeysFunc: method is nil but Env.DBCountMCPKeys was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockDBCountMCPKeys.Lock()
+	mock.calls.DBCountMCPKeys = append(mock.calls.DBCountMCPKeys, callInfo)
+	mock.lockDBCountMCPKeys.Unlock()
+	return mock.DBCountMCPKeysFunc(ctx)
+}
+
+// DBCountMCPKeysCalls gets all the calls that were made to DBCountMCPKeys.
+// Check the length with:
+//
+//	len(mockedEnv.DBCountMCPKeysCalls())
+func (mock *EnvMock) DBCountMCPKeysCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockDBCountMCPKeys.RLock()
+	calls = mock.calls.DBCountMCPKeys
+	mock.lockDBCountMCPKeys.RUnlock()
+	return calls
+}
+
 // DBCountUsers calls DBCountUsersFunc.
 func (mock *EnvMock) DBCountUsers(ctx context.Context) (int64, error) {
 	if mock.DBCountUsersFunc == nil {
@@ -595,6 +749,78 @@ func (mock *EnvMock) DBGetAdminUserByIDCalls() []struct {
 	mock.lockDBGetAdminUserByID.RLock()
 	calls = mock.calls.DBGetAdminUserByID
 	mock.lockDBGetAdminUserByID.RUnlock()
+	return calls
+}
+
+// DBGetMCPKeyByID calls DBGetMCPKeyByIDFunc.
+func (mock *EnvMock) DBGetMCPKeyByID(ctx context.Context, id int64) (db.DBGetMCPKeyByIDRow, error) {
+	if mock.DBGetMCPKeyByIDFunc == nil {
+		panic("EnvMock.DBGetMCPKeyByIDFunc: method is nil but Env.DBGetMCPKeyByID was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		ID  int64
+	}{
+		Ctx: ctx,
+		ID:  id,
+	}
+	mock.lockDBGetMCPKeyByID.Lock()
+	mock.calls.DBGetMCPKeyByID = append(mock.calls.DBGetMCPKeyByID, callInfo)
+	mock.lockDBGetMCPKeyByID.Unlock()
+	return mock.DBGetMCPKeyByIDFunc(ctx, id)
+}
+
+// DBGetMCPKeyByIDCalls gets all the calls that were made to DBGetMCPKeyByID.
+// Check the length with:
+//
+//	len(mockedEnv.DBGetMCPKeyByIDCalls())
+func (mock *EnvMock) DBGetMCPKeyByIDCalls() []struct {
+	Ctx context.Context
+	ID  int64
+} {
+	var calls []struct {
+		Ctx context.Context
+		ID  int64
+	}
+	mock.lockDBGetMCPKeyByID.RLock()
+	calls = mock.calls.DBGetMCPKeyByID
+	mock.lockDBGetMCPKeyByID.RUnlock()
+	return calls
+}
+
+// DeleteMCPKey calls DeleteMCPKeyFunc.
+func (mock *EnvMock) DeleteMCPKey(ctx context.Context, input deletemcpkey.Input) (deletemcpkey.Payload, error) {
+	if mock.DeleteMCPKeyFunc == nil {
+		panic("EnvMock.DeleteMCPKeyFunc: method is nil but Env.DeleteMCPKey was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Input deletemcpkey.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockDeleteMCPKey.Lock()
+	mock.calls.DeleteMCPKey = append(mock.calls.DeleteMCPKey, callInfo)
+	mock.lockDeleteMCPKey.Unlock()
+	return mock.DeleteMCPKeyFunc(ctx, input)
+}
+
+// DeleteMCPKeyCalls gets all the calls that were made to DeleteMCPKey.
+// Check the length with:
+//
+//	len(mockedEnv.DeleteMCPKeyCalls())
+func (mock *EnvMock) DeleteMCPKeyCalls() []struct {
+	Ctx   context.Context
+	Input deletemcpkey.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input deletemcpkey.Input
+	}
+	mock.lockDeleteMCPKey.RLock()
+	calls = mock.calls.DeleteMCPKey
+	mock.lockDeleteMCPKey.RUnlock()
 	return calls
 }
 
@@ -667,6 +893,42 @@ func (mock *EnvMock) ListAuditLogCalls() []struct {
 	mock.lockListAuditLog.RLock()
 	calls = mock.calls.ListAuditLog
 	mock.lockListAuditLog.RUnlock()
+	return calls
+}
+
+// ListMCPKeys calls ListMCPKeysFunc.
+func (mock *EnvMock) ListMCPKeys(ctx context.Context, input listmcpkeys.Input) (*listmcpkeys.Result, error) {
+	if mock.ListMCPKeysFunc == nil {
+		panic("EnvMock.ListMCPKeysFunc: method is nil but Env.ListMCPKeys was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Input listmcpkeys.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockListMCPKeys.Lock()
+	mock.calls.ListMCPKeys = append(mock.calls.ListMCPKeys, callInfo)
+	mock.lockListMCPKeys.Unlock()
+	return mock.ListMCPKeysFunc(ctx, input)
+}
+
+// ListMCPKeysCalls gets all the calls that were made to ListMCPKeys.
+// Check the length with:
+//
+//	len(mockedEnv.ListMCPKeysCalls())
+func (mock *EnvMock) ListMCPKeysCalls() []struct {
+	Ctx   context.Context
+	Input listmcpkeys.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input listmcpkeys.Input
+	}
+	mock.lockListMCPKeys.RLock()
+	calls = mock.calls.ListMCPKeys
+	mock.lockListMCPKeys.RUnlock()
 	return calls
 }
 
@@ -897,6 +1159,42 @@ func (mock *EnvMock) RemoveAdminCalls() []struct {
 	mock.lockRemoveAdmin.RLock()
 	calls = mock.calls.RemoveAdmin
 	mock.lockRemoveAdmin.RUnlock()
+	return calls
+}
+
+// RevokeMCPKey calls RevokeMCPKeyFunc.
+func (mock *EnvMock) RevokeMCPKey(ctx context.Context, input revokemcpkey.Input) (revokemcpkey.Payload, error) {
+	if mock.RevokeMCPKeyFunc == nil {
+		panic("EnvMock.RevokeMCPKeyFunc: method is nil but Env.RevokeMCPKey was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Input revokemcpkey.Input
+	}{
+		Ctx:   ctx,
+		Input: input,
+	}
+	mock.lockRevokeMCPKey.Lock()
+	mock.calls.RevokeMCPKey = append(mock.calls.RevokeMCPKey, callInfo)
+	mock.lockRevokeMCPKey.Unlock()
+	return mock.RevokeMCPKeyFunc(ctx, input)
+}
+
+// RevokeMCPKeyCalls gets all the calls that were made to RevokeMCPKey.
+// Check the length with:
+//
+//	len(mockedEnv.RevokeMCPKeyCalls())
+func (mock *EnvMock) RevokeMCPKeyCalls() []struct {
+	Ctx   context.Context
+	Input revokemcpkey.Input
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Input revokemcpkey.Input
+	}
+	mock.lockRevokeMCPKey.RLock()
+	calls = mock.calls.RevokeMCPKey
+	mock.lockRevokeMCPKey.RUnlock()
 	return calls
 }
 

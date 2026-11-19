@@ -1,0 +1,22 @@
+query ($first: Int64!, $after: Cursor) {
+	admin {
+		mcpKeys(first: $first, after: $after) {
+			totalCount
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+			nodes {
+				id
+				name
+				ownerEmail
+				createdAt {
+					formatted(layout: "2006-01-02 15:04")
+				}
+				revokedAt {
+					unix
+				}
+			}
+		}
+	}
+}

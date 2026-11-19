@@ -31,6 +31,7 @@ type Config struct {
 	DatabaseURL  string
 	DatabaseFile string
 
+	RepoURL        string
 	SignOutURL     string
 	BootstrapAdmin string
 	DevMode        bool
@@ -99,6 +100,7 @@ func (c *Config) register(r *confread.Reader) {
 	r.String(&c.BasePath, "base-path", "URL prefix the panel's routes live under; the root belongs to the SPA")
 	r.String(&c.DatabaseURL, "database-url", "sqlite database url, shared with dbmate")
 	r.Key("database-url", "DATABASE_URL")
+	r.String(&c.RepoURL, "repo-url", "repository a build's commit links to, such as https://github.com/org/app")
 	r.String(&c.SignOutURL, "sign-out-url", "the gate's sign-out endpoint the client is sent to")
 	r.String(&c.BootstrapAdmin, "bootstrap-admin", "email promoted to admin while the admins table is empty")
 	r.Bool(&c.DevMode, "dev-mode", "serve the GraphQL playground, log human-readable")
@@ -109,10 +111,23 @@ func (c *Config) check(r *confread.Reader) {
 	r.Require("public-url", c.PublicURL != "", "is empty")
 	r.Require("base-path", strings.HasPrefix(c.BasePath, "/") && !strings.HasSuffix(c.BasePath, "/"), "must start with / and must not end with /")
 
+	r.Require("repo-url", c.RepoURL == "" || isRepoURL(c.RepoURL), "must be an http(s) url that does not end with /")
+
 	parsed, err := url.Parse(c.DatabaseURL)
 	r.Require("database-url", err == nil && parsed.Scheme == "sqlite", "must be a sqlite: url")
 
 	if err == nil {
 		c.DatabaseFile = sqlite.ConnectionString(parsed)
 	}
+}
+
+func isRepoURL(raw string) bool {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+
+	web := parsed.Scheme == "https" || parsed.Scheme == "http"
+
+	return web && parsed.Host != "" && !strings.HasSuffix(raw, "/")
 }

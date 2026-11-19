@@ -3,6 +3,7 @@ $starterkit_app $starterkit_catalog
 	menu_title \Starterkit
 	plugins /
 		<= Theme $mol_theme_auto
+	Skew $starterkit_buildinfo_skew
 	menu_foot /
 		<= Foot $mol_view
 			style *
@@ -16,9 +17,7 @@ $starterkit_app $starterkit_catalog
 						<= User $mol_view
 							sub /
 								<= user_email \
-						<= Build $mol_view
-							sub /
-								<= git_commit \
+						<= Build $starterkit_buildinfo_footer
 				<= Sign_out $mol_button_minor
 					title \Sign out
 					click? <=> sign_out? null

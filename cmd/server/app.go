@@ -10,6 +10,7 @@ import (
 	goqitejobs "maragu.dev/goqite/jobs"
 
 	"starterkit/internal/appconfig"
+	"starterkit/internal/buildinfo"
 	"starterkit/internal/cronjobs"
 	"starterkit/internal/db"
 	"starterkit/internal/gateauth"
@@ -31,9 +32,9 @@ type appState struct {
 	*metrics.Metrics
 	*notifier.Notifier
 
-	config      *appconfig.Config
-	buildCommit string
-	log         logger.Logger
+	config *appconfig.Config
+	build  buildinfo.Info
+	log    logger.Logger
 
 	conns *db.Set
 
@@ -56,8 +57,8 @@ func (a *app) SignOutURL() string {
 	return a.config.SignOutURL
 }
 
-func (a *app) BuildGitCommit() string {
-	return a.buildCommit
+func (a *app) Build() buildinfo.Info {
+	return a.build
 }
 
 func (a *app) Now() time.Time {

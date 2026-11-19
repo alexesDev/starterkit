@@ -21,6 +21,13 @@ RUN git init -q . \
 # same thing is a symlink; see docs/frontend-mol.md.
 COPY assets/ui /mam/starterkit
 
+# The bundle's own half of docs/build-info.md: the commit the SPA compares with
+# every X-Build-Commit it receives. Hex or nothing, because it lands in source.
+ARG GIT_COMMIT=
+RUN echo "${GIT_COMMIT}" | grep -Eqx '[0-9a-f]*' \
+ && printf 'namespace $ {\n\texport const $starterkit_buildinfo_commit: string = %s\n}\n' "'${GIT_COMMIT}'" \
+    > /mam/starterkit/buildinfo/commit/commit.ts
+
 RUN node node_modules/.bin/mam starterkit/app
 
 FROM golang:1.26-alpine AS build
@@ -33,11 +40,13 @@ RUN go mod download
 COPY . .
 COPY --from=ui /mam/starterkit/app/- ./assets/ui/app/-
 
-# The revision the panel shows in its footer, and the only thing that puts one
-# in the binary. Left unset it says `unknown` rather than naming a revision it
-# is not.
-ARG GIT_COMMIT=unknown
-RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.GitCommit=${GIT_COMMIT}" -o /out/starterkit ./cmd/server
+# The commit and the build time the admin footer shows, stamped with -X because
+# this stage has no .git for Go to read a revision from. Left unset, the build
+# is a dev build and says so. See docs/build-info.md.
+ARG GIT_COMMIT=
+RUN CGO_ENABLED=0 go build \
+    -ldflags="-s -w -X main.GitCommit=${GIT_COMMIT} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    -o /out/starterkit ./cmd/server
 
 FROM gcr.io/distroless/static:nonroot
 

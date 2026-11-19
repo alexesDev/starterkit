@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"starterkit/internal/appreq"
+	"starterkit/internal/buildinfo"
 	"starterkit/internal/db"
 	"starterkit/internal/graph/generated"
 	"starterkit/internal/graph/model"
@@ -68,9 +69,11 @@ func (r *adminQueryResolver) AuditLog(ctx context.Context, obj *model1.AdminQuer
 	return r.Env.ListAuditLog(ctx, limit, before)
 }
 
-// BuildGitCommit is the resolver for the buildGitCommit field.
-func (r *adminQueryResolver) BuildGitCommit(ctx context.Context, obj *model1.AdminQuery) (string, error) {
-	return r.Env.BuildGitCommit(), nil
+// Build is the resolver for the build field.
+func (r *adminQueryResolver) Build(ctx context.Context, obj *model1.AdminQuery) (*buildinfo.Info, error) {
+	build := r.Env.Build()
+
+	return &build, nil
 }
 
 // IsAdmin is the resolver for the isAdmin field.

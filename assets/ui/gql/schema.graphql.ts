@@ -58,7 +58,7 @@ export type AdminQuery = {
   __typename?: 'AdminQuery';
   admins: AdminsConnection;
   auditLog: AuditLogConnection;
-  buildGitCommit: Scalars['String']['output'];
+  build: Build;
   user?: Maybe<AdminUser>;
   users: UsersConnection;
 };
@@ -119,6 +119,13 @@ export type BanUserOrErrorPayload = BanUserPayload | ErrorPayload;
 export type BanUserPayload = {
   __typename?: 'BanUserPayload';
   userId: Scalars['Int64']['output'];
+};
+
+export type Build = {
+  __typename?: 'Build';
+  builtAt?: Maybe<Timestamp>;
+  commit?: Maybe<Scalars['String']['output']>;
+  commitUrl?: Maybe<Scalars['String']['output']>;
 };
 
 export type ErrorPayload = {

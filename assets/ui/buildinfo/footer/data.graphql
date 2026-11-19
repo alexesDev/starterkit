@@ -1,0 +1,11 @@
+query {
+	admin {
+		build {
+			commit
+			builtAt {
+				formatted(layout: "2006-01-02 15:04 MST")
+			}
+			commitUrl
+		}
+	}
+}

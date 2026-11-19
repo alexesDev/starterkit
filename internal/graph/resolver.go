@@ -10,6 +10,7 @@ import (
 
 	"starterkit/internal/appreq"
 	"starterkit/internal/audit"
+	"starterkit/internal/buildinfo"
 	"starterkit/internal/case/banuser"
 	"starterkit/internal/case/listauditlog"
 	"starterkit/internal/case/makeadmin"
@@ -41,7 +42,7 @@ type Env interface {
 
 	RecordSignOut(ctx context.Context)
 	SignOutURL() string
-	BuildGitCommit() string
+	Build() buildinfo.Info
 	Logger() logger.Logger
 	Now() time.Time
 	MetricsIncreaseAdminDenied(ctx context.Context, operation string)

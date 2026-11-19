@@ -1,0 +1,19 @@
+$starterkit_buildinfo_footer $mol_view
+	sub <= content /
+	Commit $mol_button_minor
+		hint \Copy the full commit
+		click? <=> copy? null
+		sub /
+			<= commit_label \
+	Dev $mol_chip
+		title \dev
+		hint \A local build, told no commit
+	Open $mol_link
+		uri <= commit_url \
+		target \_blank
+		hint \Open the commit
+		sub /
+			<= Open_icon $mol_icon_open_in_new
+	Built $mol_view
+		sub /
+			<= built \

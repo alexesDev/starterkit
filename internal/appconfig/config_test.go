@@ -29,6 +29,7 @@ func TestEachServiceReadsItsOwnVariables(t *testing.T) {
 		"STARTERKIT_METRICS_INTERVAL=5s",
 		"STARTERKIT_SHUTDOWN_DELAY=3s",
 		"STARTERKIT_DEV_MODE=true",
+		"STARTERKIT_REPO_URL=https://git.example.com/org/app",
 	}
 
 	cfg, err := appconfig.Parse(nil, environ)
@@ -42,6 +43,7 @@ func TestEachServiceReadsItsOwnVariables(t *testing.T) {
 	require.Equal(t, 5*time.Second, cfg.Metrics.UpdateInterval)
 	require.Equal(t, 3*time.Second, cfg.Shutdown.Delay)
 	require.True(t, cfg.DevMode)
+	require.Equal(t, "https://git.example.com/org/app", cfg.RepoURL)
 }
 
 func TestEveryProblemIsNamedInOneError(t *testing.T) {
@@ -51,6 +53,7 @@ func TestEveryProblemIsNamedInOneError(t *testing.T) {
 		"STARTERKIT_LOG_LEVEL=verbose",
 		"STARTERKIT_BASE_PATH=/panel/",
 		"STARTERKIT_METRICS_ADR=127.0.0.1:9",
+		"STARTERKIT_REPO_URL=https://git.example.com/org/app/",
 	}
 
 	_, err := appconfig.Parse([]string{"--oidc-client-id="}, environ)
@@ -63,6 +66,7 @@ func TestEveryProblemIsNamedInOneError(t *testing.T) {
 		"STARTERKIT_BASE_PATH (--base-path): must start with / and must not end with /",
 		"STARTERKIT_METRICS_ADR names no setting",
 		"STARTERKIT_OIDC_CLIENT_ID (--oidc-client-id): is empty",
+		"STARTERKIT_REPO_URL (--repo-url): must be an http(s) url that does not end with /",
 	} {
 		require.Contains(t, err.Error(), problem)
 	}

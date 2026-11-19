@@ -1,0 +1,5 @@
+Query (fields: 1)
+  Query.viewer -> Viewer (fields: 2)
+Mutation (fields: 1)
+  Mutation.signOut -> SignOutPayload (fields: 1)
+

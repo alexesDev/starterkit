@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"starterkit/internal/dbtime"
+	"starterkit/internal/mcpkey"
 )
 
 const dBDeleteAdmin = `-- name: DBDeleteAdmin :execrows
@@ -32,6 +33,18 @@ delete from audit_log where created_at < ?
 func (q *WriteQueries) DBDeleteAuditLogBefore(ctx context.Context, createdAt dbtime.Stamp) error {
 	_, err := q.db.ExecContext(ctx, dBDeleteAuditLogBefore, createdAt)
 	return err
+}
+
+const dBDeleteMCPKey = `-- name: DBDeleteMCPKey :execrows
+delete from mcp_keys where id = ?
+`
+
+func (q *WriteQueries) DBDeleteMCPKey(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, dBDeleteMCPKey, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const dBDeleteUserBan = `-- name: DBDeleteUserBan :exec
@@ -83,6 +96,39 @@ func (q *WriteQueries) DBInsertAuditLog(ctx context.Context, arg DBInsertAuditLo
 	return err
 }
 
+const dBInsertMCPKey = `-- name: DBInsertMCPKey :one
+insert into mcp_keys (user_id, name, key_hash, created_at)
+values (?, ?, ?, ?)
+returning id, user_id, name, key_hash, last_used_at, revoked_at, created_at
+`
+
+type DBInsertMCPKeyParams struct {
+	UserID    int64        `json:"user_id"`
+	Name      string       `json:"name"`
+	KeyHash   mcpkey.Hash  `json:"key_hash"`
+	CreatedAt dbtime.Stamp `json:"created_at"`
+}
+
+func (q *WriteQueries) DBInsertMCPKey(ctx context.Context, arg DBInsertMCPKeyParams) (MCPKey, error) {
+	row := q.db.QueryRowContext(ctx, dBInsertMCPKey,
+		arg.UserID,
+		arg.Name,
+		arg.KeyHash,
+		arg.CreatedAt,
+	)
+	var i MCPKey
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.KeyHash,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const dBInsertUserBan = `-- name: DBInsertUserBan :one
 insert into user_bans (user_id, banned_by, reason, created_at)
 values (?, ?, ?, ?)
@@ -112,6 +158,24 @@ func (q *WriteQueries) DBInsertUserBan(ctx context.Context, arg DBInsertUserBanP
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const dBMarkMCPKeyUsed = `-- name: DBMarkMCPKeyUsed :exec
+update mcp_keys
+   set last_used_at = ?1
+ where mcp_keys.id = ?2
+   and (mcp_keys.last_used_at is null or mcp_keys.last_used_at < ?3)
+`
+
+type DBMarkMCPKeyUsedParams struct {
+	UsedAt      *dbtime.Stamp `json:"used_at"`
+	ID          int64         `json:"id"`
+	StaleBefore *dbtime.Stamp `json:"stale_before"`
+}
+
+func (q *WriteQueries) DBMarkMCPKeyUsed(ctx context.Context, arg DBMarkMCPKeyUsedParams) error {
+	_, err := q.db.ExecContext(ctx, dBMarkMCPKeyUsed, arg.UsedAt, arg.ID, arg.StaleBefore)
+	return err
 }
 
 const dBMarkSignIn = `-- name: DBMarkSignIn :execrows
@@ -146,6 +210,23 @@ type DBMoveJobToQueueParams struct {
 func (q *WriteQueries) DBMoveJobToQueue(ctx context.Context, arg DBMoveJobToQueueParams) error {
 	_, err := q.db.ExecContext(ctx, dBMoveJobToQueue, arg.Queue, arg.ID)
 	return err
+}
+
+const dBRevokeMCPKey = `-- name: DBRevokeMCPKey :execrows
+update mcp_keys set revoked_at = ? where id = ? and revoked_at is null
+`
+
+type DBRevokeMCPKeyParams struct {
+	RevokedAt *dbtime.Stamp `json:"revoked_at"`
+	ID        int64         `json:"id"`
+}
+
+func (q *WriteQueries) DBRevokeMCPKey(ctx context.Context, arg DBRevokeMCPKeyParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, dBRevokeMCPKey, arg.RevokedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const dBUpsertUserByOIDC = `-- name: DBUpsertUserByOIDC :one

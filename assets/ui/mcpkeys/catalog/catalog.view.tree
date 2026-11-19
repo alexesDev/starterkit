@@ -1,0 +1,45 @@
+$starterkit_mcpkeys_catalog $starterkit_catalog
+	param \mcpkey
+	menu_title \MCP keys
+	page_size 50
+	More $mol_button_minor
+		title \Show more
+		click? <=> more? null
+	actions /
+		<= Add $mol_link
+			hint \New key
+			arg *
+				mcpkey \add
+			sub /
+				<= Add_icon $mol_icon_plus
+	Menu_links_empty $mol_view
+		sub /
+			\No keys yet. A key lets an MCP client call this panel's API as you.
+	menu_foot /
+		<= Total $mol_view
+			style *
+				padding \var(--mol_gap_text)
+			sub /
+				<= total_text \
+	Create_page $starterkit_mcpkeys_create
+	Show_page* $starterkit_mcpkeys_show
+		mcp_key_id <= show_key_id* 0
+	menu_link_content* /
+		<= Key_item* $mol_view
+			sub /
+				<= Row* $mol_row
+					minimal_height 24
+					minimal_width 480
+					sub /
+						<= Name* $starterkit_labeler_name
+							title \Name
+							value <= row_name* \
+						<= Owner* $starterkit_labeler_name
+							title \Owner
+							value <= row_owner* \
+						<= Status* $starterkit_labeler_name
+							title \Status
+							value <= row_status* \
+						<= Created* $starterkit_labeler_moment
+							title \Created
+							value <= row_created* \

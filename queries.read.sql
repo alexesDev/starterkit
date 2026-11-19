@@ -79,3 +79,35 @@ select count(*) from goqite where queue = ?;
 
 -- name: DBCountExhaustedJobs :one
 select count(*) from goqite where queue = @queue and received >= @max_receive;
+
+-- name: DBListMCPKeys :many
+select k.id, k.name, k.created_at, k.last_used_at, k.revoked_at, k.user_id, u.email as owner_email
+  from mcp_keys k
+  join users u on u.id = k.user_id
+ where k.id < sqlc.arg(before)
+ order by k.id desc
+ limit sqlc.arg(page_limit);
+
+-- name: DBCountMCPKeys :one
+select count(*) from mcp_keys;
+
+-- name: DBGetMCPKeyByID :one
+select k.id, k.name, k.created_at, k.last_used_at, k.revoked_at, k.user_id, u.email as owner_email
+  from mcp_keys k
+  join users u on u.id = k.user_id
+ where k.id = ?;
+
+-- name: DBGetMCPKeyIdentityByHash :one
+select k.id as key_id,
+       k.revoked_at,
+       u.id,
+       u.email,
+       u.name,
+       u.created_at,
+       case when a.user_id is null then 0 else 1 end as is_admin,
+       coalesce(b.reason, '') as ban_reason
+  from mcp_keys k
+  join users u on u.id = k.user_id
+  left join admins a on a.user_id = u.id
+  left join user_bans b on b.user_id = u.id
+ where k.key_hash = ?;

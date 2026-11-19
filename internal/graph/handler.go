@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/lru"
@@ -10,22 +11,39 @@ import (
 	"starterkit/internal/graph/generated"
 )
 
+const complexityLimit = 60
+
 type Introspection bool
 
-func NewHandler(env Env, introspection Introspection) *handler.Server {
+type configurable interface {
+	Use(extension graphql.HandlerExtension)
+	SetQueryCache(cache graphql.Cache[*ast.QueryDocument])
+	SetErrorPresenter(f graphql.ErrorPresenterFunc)
+}
+
+func newExecutableSchema(env Env) graphql.ExecutableSchema {
 	resolver := Resolver{Env: env}
-	executable := generated.NewExecutableSchema(generated.Config{Resolvers: &resolver})
-	srv := handler.New(executable)
+
+	return generated.NewExecutableSchema(generated.Config{Resolvers: &resolver})
+}
+
+func configure(target configurable, env Env, introspection Introspection) {
+	target.SetQueryCache(lru.New[*ast.QueryDocument](200))
+
+	if introspection {
+		target.Use(extension.Introspection{})
+	}
+
+	target.Use(extension.FixedComplexityLimit(complexityLimit))
+	target.SetErrorPresenter(errorPresenter(env.Logger()))
+}
+
+func NewHandler(env Env, introspection Introspection) *handler.Server {
+	srv := handler.New(newExecutableSchema(env))
 
 	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.POST{})
-	srv.SetQueryCache(lru.New[*ast.QueryDocument](200))
-	if introspection {
-		srv.Use(extension.Introspection{})
-	}
-	srv.Use(extension.FixedComplexityLimit(60))
-
-	srv.SetErrorPresenter(errorPresenter(env.Logger()))
+	configure(srv, env, introspection)
 
 	return srv
 }

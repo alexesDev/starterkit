@@ -34,6 +34,18 @@ http:
       middlewares:
         - security-headers
 
+    # The MCP endpoint, ungated by the proxy: its callers are programs holding a
+    # key, not browsers holding a session, so forward-auth could only refuse
+    # them. The panel checks the key itself (docs/mcp.md), which makes this the
+    # one path with a single wall.
+    mcp:
+      rule: "Host(`{{ $panel }}`) && Path(`/_system/starterkit/mcp`)"
+      entryPoints: [web]
+      service: panel
+      priority: 90
+      middlewares:
+        - security-headers
+
     # Dex on its own hostname, ungated: it is the sign-in page. The gate's
     # whole flow terminates here, so putting the forward-auth middleware in
     # front of it would be a lock on the door the keys are behind.

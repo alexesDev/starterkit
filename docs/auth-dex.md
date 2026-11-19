@@ -219,10 +219,16 @@ is the *second* one: Traefik refuses unauthenticated requests before they reach
 the process at all, so a route that forgot `requireIdentity` is still not
 exposed. See [traefik-forward-auth.md](traefik-forward-auth.md).
 
+The MCP endpoint is the exception: its callers hold a key, not a session, so
+Traefik lets that one path through and the panel's key check is its only wall.
+[mcp.md](mcp.md) says why that was accepted and how to add the second one.
+
 ## Secrets at rest
 
-There are none. The panel verifies the gate's ID token and holds no session, no
-client secret and no signing key, and nothing in the schema is a credential. A
-project built from this kit that adds one is making a design decision, not a
-convenience — write down where it lives, what opens it, and what a full
-compromise of the process reaches.
+None that can be presented. The panel verifies the gate's ID token and holds no
+session, no client secret and no signing key. MCP keys are kept as SHA-256
+hashes of 256 random bits: a copy of the database does not let anyone call the
+API, and the key itself exists only in the `createMCPKey` response
+([mcp.md](mcp.md)). A project built from this kit that adds a real secret is
+making a design decision, not a convenience — write down where it lives, what
+opens it, and what a full compromise of the process reaches.

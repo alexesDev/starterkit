@@ -27,6 +27,7 @@ table of where each kind of change goes. Then, as needed:
 | [docs/metrics-and-shutdown.md](docs/metrics-and-shutdown.md) | Before adding a metric or touching shutdown |
 | [docs/behavioural-testing.md](docs/behavioural-testing.md) | Before changing e2e or the snapshot baseline |
 | [docs/auth-dex.md](docs/auth-dex.md) | Before touching identity, admin checks, or the audit log |
+| [docs/mcp.md](docs/mcp.md) | Before touching the MCP endpoint, MCP keys, or how a machine caller authenticates |
 | [docs/traefik-forward-auth.md](docs/traefik-forward-auth.md) | Before touching the container stack |
 | [docs/container-images.md](docs/container-images.md) | Before writing a Dockerfile, or adding a binary that ships as its own image |
 | [docs/build-info.md](docs/build-info.md) | Before touching how a build names its commit, the admin footer, or the reload bar |

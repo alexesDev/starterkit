@@ -1,0 +1,13 @@
+mutation ($input: RevokeMCPKeyInput!) {
+	admin {
+		revokeMCPKey(input: $input) {
+			__typename
+			... on RevokeMCPKeyPayload {
+				mcpKeyId
+			}
+			... on ErrorPayload {
+				message
+			}
+		}
+	}
+}

@@ -9,6 +9,7 @@ sql:
         out: "internal/db"
         emit_json_tags: true
         emit_pointers_for_null_types: true
+        initialisms: &initialisms ["id", "mcp"]
         overrides: &overrides
           - column: "*.created_at"
             go_type: &stamp
@@ -20,6 +21,19 @@ sql:
               import: "starterkit/internal/dbtime"
               type: "Stamp"
               pointer: true
+          - column: "*.last_used_at"
+            nullable: true
+            go_type: &nullable_stamp
+              import: "starterkit/internal/dbtime"
+              type: "Stamp"
+              pointer: true
+          - column: "*.revoked_at"
+            nullable: true
+            go_type: *nullable_stamp
+          - column: "mcp_keys.key_hash"
+            go_type:
+              import: "starterkit/internal/mcpkey"
+              type: "Hash"
 
   - engine: "sqlite"
     queries: "queries.write.sql"
@@ -30,4 +44,5 @@ sql:
         out: "internal/db"
         emit_json_tags: true
         emit_pointers_for_null_types: true
+        initialisms: *initialisms
         overrides: *overrides

@@ -25,5 +25,7 @@ $starterkit_app $starterkit_catalog
 	spreads *
 		users <= Users $starterkit_users_catalog
 			close_icon <= Spread_close
+		mcpkeys <= Mcpkeys $starterkit_mcpkeys_catalog
+			close_icon <= Spread_close
 		auditlog <= Auditlog $starterkit_auditlog
 			close_icon <= Spread_close

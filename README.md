@@ -63,6 +63,7 @@ Everything below is a worked example, not scaffolding you have to keep:
 | `internal/notifier`, `internal/case/notifyuserbanned`, the `notify-user-banned` job | the service-object example (keep it as a template for a real client) |
 | `internal/case/{banuser,unbanuser}`, `user_bans`, the ban UI | bans |
 | `internal/case/{makeadmin,removeadmin}` | admin management from the UI |
+| `internal/mcpserver`, `internal/mcpkey`, `internal/case/*mcpkey`, `cmd/server/mcp.go`, `mcp_keys`, `assets/ui/mcpkeys` | the MCP endpoint and its keys ([docs/mcp.md](docs/mcp.md)) |
 | `assets/ui/auditlog`, `internal/case/listauditlog` | the audit log *screen* — keep `audit_log` itself, the boundary writes to it |
 | `assets/ui/**` and `assets/embed.go` | the SPA at all — the GraphQL endpoint stands alone |
 | `e2e/`, `playwright.config.ts`, `scripts/e2e.sh` | the behavioural suite |

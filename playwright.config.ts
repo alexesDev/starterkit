@@ -42,7 +42,8 @@ export default defineConfig({
 		spec('boundary-and-audit', 'auth'),
 		spec('bans', 'boundary-and-audit'),
 		spec('admins', 'bans'),
-		spec('snapshot', 'admins'),
+		spec('mcpkeys', 'admins'),
+		spec('snapshot', 'mcpkeys'),
 		{ ...spec('drain', 'snapshot'), timeout: 60_000 },
 	],
 });

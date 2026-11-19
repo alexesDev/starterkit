@@ -31,6 +31,11 @@ process, not a secret, not a line of code. A missing `requireIdentity` on a new
 route, a bug in our own header handling — none of it gets a request past
 Traefik, because Traefik never asks the panel anything.
 
+One path is let through ungated: `<BasePath>/mcp`, whose callers are programs
+with a key rather than browsers with a session. The `mcp` router in
+`gate.yml` matches that exact path and nothing under it; [mcp.md](mcp.md)
+covers the single wall it leaves.
+
 `e2e/gate.spec.ts` proves the unauthenticated half on every run, against a stand
 where the panel container is *stopped*. A gate that holds while the thing behind
 it is absent cannot be passing for any reason other than the gate.

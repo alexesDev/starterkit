@@ -37,3 +37,7 @@ models:
   Int64:
     model:
       - github.com/99designs/gqlgen/graphql.Int64
+
+go_initialisms:
+  initialisms:
+    - MCP

@@ -16,6 +16,7 @@ import (
 	"starterkit/internal/cronjobs"
 	"starterkit/internal/db"
 	"starterkit/internal/gateauth"
+	"starterkit/internal/graph"
 	"starterkit/internal/logger"
 	"starterkit/internal/metrics"
 	"starterkit/internal/notifier"
@@ -36,6 +37,7 @@ type appState struct {
 	*metrics.Metrics
 	*notifier.Notifier
 	*backup.Backup
+	*graph.Executor
 
 	config *appconfig.Config
 	build  buildinfo.Info

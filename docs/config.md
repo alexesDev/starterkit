@@ -55,6 +55,7 @@ on it without a cycle. A check that relates two services stays in
 | `notifier` | `notifier-from` |
 | `clientip` | `trusted-proxies` |
 | `metrics` | `metrics-addr`, `metrics-interval` |
+| `mcpserver` | `mcp-response-chars` |
 | `logger` | `log-level` (zerolog behind `logger.Logger`: JSON lines on stderr, a console format with a short time in `dev-mode`) |
 | `page` | `page-default`, `page-max` |
 

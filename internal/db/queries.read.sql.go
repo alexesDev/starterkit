@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"starterkit/internal/dbtime"
+	"starterkit/internal/mcpkey"
 )
 
 const dBCountAdmins = `-- name: DBCountAdmins :one
@@ -44,6 +45,17 @@ type DBCountExhaustedJobsParams struct {
 
 func (q *Queries) DBCountExhaustedJobs(ctx context.Context, arg DBCountExhaustedJobsParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, dBCountExhaustedJobs, arg.Queue, arg.MaxReceive)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const dBCountMCPKeys = `-- name: DBCountMCPKeys :one
+select count(*) from mcp_keys
+`
+
+func (q *Queries) DBCountMCPKeys(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, dBCountMCPKeys)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -165,6 +177,81 @@ func (q *Queries) DBGetIdentityByOIDC(ctx context.Context, arg DBGetIdentityByOI
 	return i, err
 }
 
+const dBGetMCPKeyByID = `-- name: DBGetMCPKeyByID :one
+select k.id, k.name, k.created_at, k.last_used_at, k.revoked_at, k.user_id, u.email as owner_email
+  from mcp_keys k
+  join users u on u.id = k.user_id
+ where k.id = ?
+`
+
+type DBGetMCPKeyByIDRow struct {
+	ID         int64         `json:"id"`
+	Name       string        `json:"name"`
+	CreatedAt  dbtime.Stamp  `json:"created_at"`
+	LastUsedAt *dbtime.Stamp `json:"last_used_at"`
+	RevokedAt  *dbtime.Stamp `json:"revoked_at"`
+	UserID     int64         `json:"user_id"`
+	OwnerEmail string        `json:"owner_email"`
+}
+
+func (q *Queries) DBGetMCPKeyByID(ctx context.Context, id int64) (DBGetMCPKeyByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, dBGetMCPKeyByID, id)
+	var i DBGetMCPKeyByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.CreatedAt,
+		&i.LastUsedAt,
+		&i.RevokedAt,
+		&i.UserID,
+		&i.OwnerEmail,
+	)
+	return i, err
+}
+
+const dBGetMCPKeyIdentityByHash = `-- name: DBGetMCPKeyIdentityByHash :one
+select k.id as key_id,
+       k.revoked_at,
+       u.id,
+       u.email,
+       u.name,
+       u.created_at,
+       case when a.user_id is null then 0 else 1 end as is_admin,
+       coalesce(b.reason, '') as ban_reason
+  from mcp_keys k
+  join users u on u.id = k.user_id
+  left join admins a on a.user_id = u.id
+  left join user_bans b on b.user_id = u.id
+ where k.key_hash = ?
+`
+
+type DBGetMCPKeyIdentityByHashRow struct {
+	KeyID     int64         `json:"key_id"`
+	RevokedAt *dbtime.Stamp `json:"revoked_at"`
+	ID        int64         `json:"id"`
+	Email     string        `json:"email"`
+	Name      string        `json:"name"`
+	CreatedAt dbtime.Stamp  `json:"created_at"`
+	IsAdmin   int64         `json:"is_admin"`
+	BanReason string        `json:"ban_reason"`
+}
+
+func (q *Queries) DBGetMCPKeyIdentityByHash(ctx context.Context, keyHash mcpkey.Hash) (DBGetMCPKeyIdentityByHashRow, error) {
+	row := q.db.QueryRowContext(ctx, dBGetMCPKeyIdentityByHash, keyHash)
+	var i DBGetMCPKeyIdentityByHashRow
+	err := row.Scan(
+		&i.KeyID,
+		&i.RevokedAt,
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.CreatedAt,
+		&i.IsAdmin,
+		&i.BanReason,
+	)
+	return i, err
+}
+
 const dBGetUserBan = `-- name: DBGetUserBan :one
 select user_id, banned_by, reason, created_at from user_bans where user_id = ?
 `
@@ -278,6 +365,61 @@ func (q *Queries) DBListAuditLog(ctx context.Context, arg DBListAuditLogParams) 
 			&i.Detail,
 			&i.Ip,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const dBListMCPKeys = `-- name: DBListMCPKeys :many
+select k.id, k.name, k.created_at, k.last_used_at, k.revoked_at, k.user_id, u.email as owner_email
+  from mcp_keys k
+  join users u on u.id = k.user_id
+ where k.id < ?1
+ order by k.id desc
+ limit ?2
+`
+
+type DBListMCPKeysParams struct {
+	Before    int64 `json:"before"`
+	PageLimit int64 `json:"page_limit"`
+}
+
+type DBListMCPKeysRow struct {
+	ID         int64         `json:"id"`
+	Name       string        `json:"name"`
+	CreatedAt  dbtime.Stamp  `json:"created_at"`
+	LastUsedAt *dbtime.Stamp `json:"last_used_at"`
+	RevokedAt  *dbtime.Stamp `json:"revoked_at"`
+	UserID     int64         `json:"user_id"`
+	OwnerEmail string        `json:"owner_email"`
+}
+
+func (q *Queries) DBListMCPKeys(ctx context.Context, arg DBListMCPKeysParams) ([]DBListMCPKeysRow, error) {
+	rows, err := q.db.QueryContext(ctx, dBListMCPKeys, arg.Before, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DBListMCPKeysRow
+	for rows.Next() {
+		var i DBListMCPKeysRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.LastUsedAt,
+			&i.RevokedAt,
+			&i.UserID,
+			&i.OwnerEmail,
 		); err != nil {
 			return nil, err
 		}

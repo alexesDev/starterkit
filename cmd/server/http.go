@@ -42,7 +42,11 @@ func (a *app) routes() http.Handler {
 	mux.Handle("GET "+base+"/settings.js", a.requireIdentity(settingsScript(base)))
 	mux.Handle("GET /", a.requireIdentity(assets.SPAHandler(base, a.build.Revision())))
 
-	return securityHeaders(http.NewCrossOriginProtection().Handler(a.withRequest(mux)))
+	root := http.NewServeMux()
+	root.Handle(base+"/mcp", a.mcpRoute())
+	root.Handle("/", a.withRequest(mux))
+
+	return securityHeaders(http.NewCrossOriginProtection().Handler(root))
 }
 
 func settingsScript(basePath string) http.Handler {
@@ -98,9 +102,8 @@ func limitBody(next http.Handler) http.Handler {
 
 func (a *app) withRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req := appreq.New(clientip.Resolve(r, a.config.Proxies.Trusted))
-		ctx := req.NewContext(r.Context())
-		r = r.WithContext(ctx)
+		req, r := a.newRequest(r)
+		ctx := r.Context()
 
 		identity, err := a.resolveIdentity(req, r)
 		if err != nil {
@@ -124,6 +127,12 @@ func (a *app) withRequest(next http.Handler) http.Handler {
 
 		a.flushAudit(ctx, req.TakeAudit())
 	})
+}
+
+func (a *app) newRequest(r *http.Request) (*appreq.Request, *http.Request) {
+	req := appreq.New(clientip.Resolve(r, a.config.Proxies.Trusted))
+
+	return req, r.WithContext(req.NewContext(r.Context()))
 }
 
 func (a *app) refuseStaleToken(w http.ResponseWriter, r *http.Request) {

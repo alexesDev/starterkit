@@ -6,6 +6,7 @@ package db
 
 import (
 	"starterkit/internal/dbtime"
+	"starterkit/internal/mcpkey"
 )
 
 type Admin struct {
@@ -32,6 +33,16 @@ type Goqite struct {
 	Timeout  string `json:"timeout"`
 	Received int64  `json:"received"`
 	Priority int64  `json:"priority"`
+}
+
+type MCPKey struct {
+	ID         int64         `json:"id"`
+	UserID     int64         `json:"user_id"`
+	Name       string        `json:"name"`
+	KeyHash    mcpkey.Hash   `json:"key_hash"`
+	LastUsedAt *dbtime.Stamp `json:"last_used_at"`
+	RevokedAt  *dbtime.Stamp `json:"revoked_at"`
+	CreatedAt  dbtime.Stamp  `json:"created_at"`
 }
 
 type SchemaMigration struct {

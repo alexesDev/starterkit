@@ -12,11 +12,15 @@ import (
 	"starterkit/internal/audit"
 	"starterkit/internal/buildinfo"
 	"starterkit/internal/case/banuser"
+	"starterkit/internal/case/createmcpkey"
+	"starterkit/internal/case/deletemcpkey"
 	"starterkit/internal/case/listadmins"
 	"starterkit/internal/case/listauditlog"
+	"starterkit/internal/case/listmcpkeys"
 	"starterkit/internal/case/listusers"
 	"starterkit/internal/case/makeadmin"
 	"starterkit/internal/case/removeadmin"
+	"starterkit/internal/case/revokemcpkey"
 	"starterkit/internal/case/unbanuser"
 	"starterkit/internal/db"
 	"starterkit/internal/logger"
@@ -39,10 +43,16 @@ type Env interface {
 	ListAuditLog(ctx context.Context, input listauditlog.Input) (*listauditlog.Result, error)
 	ListUsers(ctx context.Context, input listusers.Input) (*listusers.Result, error)
 	ListAdmins(ctx context.Context, input listadmins.Input) (*listadmins.Result, error)
+	ListMCPKeys(ctx context.Context, input listmcpkeys.Input) (*listmcpkeys.Result, error)
+	CreateMCPKey(ctx context.Context, input createmcpkey.Input) (createmcpkey.Payload, error)
+	RevokeMCPKey(ctx context.Context, input revokemcpkey.Input) (revokemcpkey.Payload, error)
+	DeleteMCPKey(ctx context.Context, input deletemcpkey.Input) (deletemcpkey.Payload, error)
 
 	DBCountUsers(ctx context.Context) (int64, error)
 	DBGetAdminUserByID(ctx context.Context, id int64) (db.DBGetAdminUserByIDRow, error)
 	DBCountAdmins(ctx context.Context) (int64, error)
+	DBCountMCPKeys(ctx context.Context) (int64, error)
+	DBGetMCPKeyByID(ctx context.Context, id int64) (db.DBGetMCPKeyByIDRow, error)
 	DBCountAuditLog(ctx context.Context) (int64, error)
 
 	RecordSignOut(ctx context.Context)

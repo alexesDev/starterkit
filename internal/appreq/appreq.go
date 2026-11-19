@@ -16,9 +16,10 @@ type ctxKeyType struct{}
 var ErrNotFound = errors.New("request not found in context")
 
 type Request struct {
-	user    *db.User
-	isAdmin bool
-	ip      string
+	user     *db.User
+	isAdmin  bool
+	ip       string
+	mcpKeyID *int64
 
 	audits audit.Buffer
 }
@@ -71,4 +72,12 @@ func (c *Request) UserID() *int64 {
 	}
 
 	return &c.user.ID
+}
+
+func (c *Request) SetMCPKey(id int64) {
+	c.mcpKeyID = &id
+}
+
+func (c *Request) MCPKeyID() *int64 {
+	return c.mcpKeyID
 }
